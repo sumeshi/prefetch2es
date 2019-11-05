@@ -57,7 +57,7 @@ def prefetch2es(filepath: str, host: str = 'localhost', port: int = 9200, index:
 
     # work in progress
     parent = Path(__file__).parent.parent
-    check_output(f"python {parent}/analyzePF/apf.py parse csv summary -s {filepath} -t ./{Path(filepath).with_suffix('')}.csv", shell=True)
+    check_output(f"python {parent}/analyzePF/apf.py parse csv summary -s {filepath} -t {Path(filepath).with_suffix('')}.csv", shell=True)
 
     csv_lines = Path(f"{Path(filepath).with_suffix('')}.csv").read_text().splitlines()
     os.remove(f"{Path(filepath).with_suffix('')}.csv")
