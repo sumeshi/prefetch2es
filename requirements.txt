@@ -2,3 +2,7 @@ elasticsearch==7.0.5
 six==1.11.0
 tqdm==4.36.1
 urllib3==1.25.6
+prefetch==0.0.0
+semantic-version==2.8.4
+setuptools-rust==0.10.6
+toml==0.10.0
