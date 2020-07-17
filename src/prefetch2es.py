@@ -16,11 +16,10 @@ class ElasticsearchUtils(object):
     def __init__(self, hostname: str, port: int) -> None:
         self.es = Elasticsearch(host=hostname, port=port)
 
-    def bulk_indice(self, records, index_name: str, type_name: str) -> None:
+    def bulk_indice(self, records, index_name: str) -> None:
         bulk(self.es, [
             {
                 '_index': index_name,
-                '_type': type_name,
                 '_source': record
             } for record in records]
         )
@@ -48,14 +47,14 @@ class Prefetch2es(object):
         return result
 
 
-def prefetch2es(filepath: str, host: str = 'localhost', port: int = 9200, index: str = 'prefetch2es', type: str = 'prefetch2es'):
+def prefetch2es(filepath: str, host: str = 'localhost', port: int = 9200, index: str = 'prefetch2es'):
     es = ElasticsearchUtils(hostname=host, port=port)
 
     try:
         prefetch = Prefetch2es(filepath)
         result = [prefetch.get_json()]
 
-        es.bulk_indice(result, index, type)
+        es.bulk_indice(result, index)
     except Exception:
         traceback.print_exc()
 
@@ -66,7 +65,6 @@ def main():
     parser.add_argument('--host', default='localhost', help='ElasticSearch host address')
     parser.add_argument('--port', default=9200, help='ElasticSearch port number')
     parser.add_argument('--index', default='prefetch2es', help='Index name')
-    parser.add_argument('--type', default='prefetch2es', help='Document type name')
     args = parser.parse_args()
 
     prefetch2es(
@@ -74,7 +72,6 @@ def main():
         host=args.host,
         port=int(args.port),
         index=args.index,
-        type=args.type
     )
 
 
