@@ -1,5 +1,7 @@
 # Prefetch2es
 [![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
+[![PyPI version](https://badge.fury.io/py/prefetch2es.svg)](https://badge.fury.io/py/prefetch2es)
+[![Python Versions](https://img.shields.io/pypi/pyversions/prefetch2es.svg)](https://pypi.org/project/prefetch2es/)
 
 Import Windows Prefetch(.pf) to Elasticsearch
 
@@ -58,7 +60,7 @@ if __name__ == '__main__':
 ## Installation
 ### via pip
 ```
-$ pip install git+https://github.com/sumeshi/prefetch2es
+$ pip install prefetch2es
 ```
 
 The source code for prefetch2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/prefetch2es).
