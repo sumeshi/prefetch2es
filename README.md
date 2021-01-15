@@ -26,9 +26,13 @@ if __name__ == '__main__':
 ## Arguments
 prefetch2es supports importing from multiple files.
 
+```
 $ prefetch2es file1.pf file2.pf file3.pf
+```
+
 Also, possible to import recursively from a specific directory.
 
+```
 $ tree .
 pffiles/
   ├── file1.pf
@@ -41,6 +45,7 @@ pffiles/
       └── file6.pf
 
 $ prefetch2es /pffiles/ # The Path is recursively expanded to file1~6.pf.
+```
 
 ### Options
 ```
@@ -80,7 +85,7 @@ $ prefetch2es /path/to/your/file.pf --host=localhost --port=9200 --index=foobar
 
 When using from the python-script:
 
-```
+```python
 if __name__ == '__main__':
     prefetch2es('/path/to/your/file.pf', host=localhost, port=9200, index='foobar')
 ```
@@ -123,7 +128,7 @@ $ prefetch2json /path/to/your/file.pf /path/to/output/target.json
 
 Convert from Windows Prefetch to Python dict object.
 
-```
+```python
 from prefetch2es import prefetch2json
 
 if __name__ == '__main__':
