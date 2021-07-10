@@ -196,12 +196,12 @@ https://hub.docker.com/r/sumeshi/prefetch2es
 ```bash
 # "host.docker.internal" is only available in mac and windows environments.
 # For linux, use the --add-host option.
-$ docker run -t --rm -v $(pwd):/app sumeshi/prefetch2es:latest prefetch2es SAMPLE.pf --host=host.docker.internal
+$ docker run -t --rm -v $(pwd):/app/work sumeshi/prefetch2es:latest prefetch2es /app/work/SAMPLE.pf --host=host.docker.internal
 ```
 
 ## prefetch2json
 ```bash
-$ docker run -t --rm -v $(pwd):/app sumeshi/prefetch2es:latest prefetch2es SAMPLE.pf out.json
+$ docker run -t --rm -v $(pwd):/app/work sumeshi/prefetch2es:latest prefetch2es /app/work/SAMPLE.pf /app/work/out.json
 ```
 
 Do not use the "latest" image if at all possible.  
@@ -209,7 +209,7 @@ The "latest" image is not a released version, but is built from the contents of 
 
 ## Contributing
 
-[CONTRIBUTING](https://github.com/sumeshi/prefetch2es/blob/master/CONTRIBUTING)
+[CONTRIBUTING](https://github.com/sumeshi/prefetch2es/blob/master/CONTRIBUTING.md)
 
 The source code for prefetch2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/prefetch2es).
 Please report issues and feature requests. :sushi: :sushi: :sushi:
