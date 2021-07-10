@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "prefetch2es"
-version = "2.0.0"
+version = "2.1.0"
 description = "A library for fast import of Windows Prefetch into Elasticsearch."
 authors = ["sumeshi <j15322sn@gmail.com>"]
 license = "MIT"
@@ -20,6 +20,7 @@ python = "^3.7"
 elasticsearch = "^7.8.0"
 tqdm = "^4.48.0"
 libscca-python = "^20200717"
+urllib3 = "^1.26.5"
 orjson = "^3.4.6"
 
 [tool.poetry.dev-dependencies]

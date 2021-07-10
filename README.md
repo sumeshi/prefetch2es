@@ -2,8 +2,13 @@
 [![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
 [![PyPI version](https://badge.fury.io/py/prefetch2es.svg)](https://badge.fury.io/py/prefetch2es)
 [![Python Versions](https://img.shields.io/pypi/pyversions/prefetch2es.svg)](https://pypi.org/project/prefetch2es/)
+[![DockerHub Status](https://shields.io/docker/cloud/build/sumeshi/prefetch2es)](https://hub.docker.com/r/sumeshi/prefetch2es)
 
-Import Windows Prefetch(.pf) to Elasticsearch
+![prefetch2es logo](https://gist.githubusercontent.com/sumeshi/c2f430d352ae763273faadf9616a29e5/raw/fd3921cb75a484af98d795f194e9e4cb16b88515/prefetch2es.svg)
+
+Fast import of Windows Prefetch(.pf) into Elasticsearch.
+
+prefetch2es uses C library [libscca](https://github.com/libyal/libscca).
 
 ## Usage
 
@@ -64,6 +69,10 @@ $ prefetch2es /pffiles/ # The Path is recursively expanded to file1~6.pf.
 --scheme:
   Scheme to use (http, or https)
   (default: http)
+
+--pipeline
+  Elasticsearch Ingest Pipeline to use
+  (default: )
 
 --login:
   The login to use if Elastic Security is enable
@@ -168,13 +177,41 @@ Using the sample prefetch file of [EricZimmerman/Prefetch](https://github.com/Er
 ```
 
 ## Installation
-### via pip
+
+### via PyPI
 ```
 $ pip install prefetch2es
 ```
 
-The source code for prefetch2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/prefetch2es).
+### via DockerHub
+```
+$ docker pull sumeshi/prefetch2es:latest
+```
 
+## Run with Docker
+https://hub.docker.com/r/sumeshi/prefetch2es
+
+
+## prefetch2es
+```bash
+# "host.docker.internal" is only available in mac and windows environments.
+# For linux, use the --add-host option.
+$ docker run -t --rm -v $(pwd):/app sumeshi/prefetch2es:latest prefetch2es SAMPLE.pf --host=host.docker.internal
+```
+
+## prefetch2json
+```bash
+$ docker run -t --rm -v $(pwd):/app sumeshi/prefetch2es:latest prefetch2es SAMPLE.pf out.json
+```
+
+Do not use the "latest" image if at all possible.  
+The "latest" image is not a released version, but is built from the contents of the master branch.
+
+## Contributing
+
+[CONTRIBUTING](https://github.com/sumeshi/prefetch2es/blob/master/CONTRIBUTING)
+
+The source code for prefetch2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/prefetch2es).
 Please report issues and feature requests. :sushi: :sushi: :sushi:
 
 ## License

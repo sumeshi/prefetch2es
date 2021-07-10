@@ -2,7 +2,6 @@
 import argparse
 import traceback
 from pathlib import Path
-from typing import List, Generator
 from hashlib import sha1
 
 import pyscca
@@ -27,17 +26,20 @@ class ElasticsearchUtils(object):
         """
         return sha1(orjson.dumps(record, option=orjson.OPT_SORT_KEYS)).hexdigest()
 
-    def bulk_indice(self, record: dict, index_name: str) -> None:
+    def bulk_indice(self, record: dict, index_name: str, pipeline: str) -> None:
         """Bulk indices the documents into Elasticsearch.
         Args:
             record (dict): Dictionary of record read from prefetch files.
             index_name (str): Target Elasticsearch Index.
+            pipeline (str): Target Elasticsearch Ingest Pipeline
         """
-        bulk(
-            self.es,
-            [{"_id": self.calc_hash(record), "_index": index_name, "_source": record}],
-            raise_on_error=False,
-        )
+        events = []
+        event = {"_id": self.calc_hash(record), "_index": index_name, "_source": record}
+        if pipeline != "":
+            event["pipeline"] = pipeline
+        events.append(event)
+
+        bulk(self.es, events, raise_on_error=False)
 
 
 class Prefetch2es(object):
@@ -81,6 +83,7 @@ def prefetch2es(
     port: int = 9200,
     index: str = "prefetch2es",
     scheme: str = "http",
+    pipeline: str = "",
     login: str = "",
     pwd: str = ""
 ):
@@ -88,16 +91,25 @@ def prefetch2es(
     Args:
         filepath (str):
             Windows Prefetch to import into Elasticsearch.
+
         host (str, optional):
             Elasticsearch host address. Defaults to "localhost".
+
         port (int, optional):
             Elasticsearch port number. Defaults to 9200.
+
         index (str, optional):
             Name of the index to create. Defaults to "prefetch2es".
+
         scheme (str, optional):
             Elasticsearch address scheme. Defaults to "http".
+
+        pipeline (str, optional):
+            Elasticsearch Ingest Pipeline. Defaults to "".
+
         login (str,optional):
             Elasticsearch login to connect into.
+
         pwd (str,optional):
             Elasticsearch password associated with the login provided.
     """
@@ -105,7 +117,7 @@ def prefetch2es(
 
     r = Prefetch2es(filepath)
     try:
-        es.bulk_indice(r.to_dict(), index)
+        es.bulk_indice(r.to_dict(), index, pipeline)
     except Exception:
         traceback.print_exc()
 
@@ -114,6 +126,7 @@ def prefetch2json(filepath: str) -> dict:
     """Convert prefetch to json.
     Args:
         filepath (str): Input Prefetch(.pf) file.
+
     Note:
         Since the content of the file is loaded into memory at once,
         it requires the same amount of memory as the file to be loaded.
@@ -139,6 +152,7 @@ def console_prefetch2es():
     parser.add_argument("--port", default=9200, help="Elasticsearch port number")
     parser.add_argument("--index", default="prefetch2es", help="Index name")
     parser.add_argument("--scheme", default="http", help="Scheme to use (http, https)")
+    parser.add_argument("--pipeline", default="", help="Ingest pipeline to use")
     parser.add_argument("--login", default="elastic", help="Login to use to connect to Elastic database")
     parser.add_argument("--pwd", default="", help="Password associated with the login")
     args = parser.parse_args()
@@ -161,6 +175,7 @@ def console_prefetch2es():
             port=int(args.port),
             index=args.index,
             scheme=args.scheme,
+            pipeline=args.pipeline,
             login=args.login,
             pwd=args.pwd
         )
