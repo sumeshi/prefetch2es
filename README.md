@@ -215,6 +215,6 @@ The source code for prefetch2es is hosted at GitHub, and you may download, fork,
 Please report issues and feature requests. :sushi: :sushi: :sushi:
 
 ## License
-prefetch2es is released under the [MIT](https://github.com/sumeshi/prefetch2es/blob/master/LICENSE) License.
+prefetch2es is released under the [LGPLv3+](https://github.com/sumeshi/prefetch2es/blob/master/LICENSE) License.
 
 Powered by [libscca](https://github.com/libyal/libscca).
