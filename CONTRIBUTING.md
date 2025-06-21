@@ -1,46 +1,67 @@
 # Contributing to prefetch2es
+Thank you for your interest in contributing to prefetch2es!
 
-I am trying to make prefetch2es better.  
-For that I need your help.  
+## Getting Started
+### Development Setup
 
-## Found a Bug?
-If you find a bug in the source code, you can submit an issue or pull request to the repository.  
+**Recommended: Using Dev Container**
 
-## Missing a Feature?
-To request a new feature, submit an issue to the repository.  
+This project includes a dev container configuration for consistent development environment:
 
-However, I do not expect this tool to be able to do everything.  
-I believe that prefetch2es should exist as a small-scale utility, not as a large-scale application.  
-
-## Development
-1. Fork the this repository
-2. Edit Source Codes
-3. Push to the your forked repository
-4. Create a new pull request
-
-### Quickstart
+1. Fork the repository on GitHub
+2. Clone your fork locally:
 
 ```bash
-$ git clone github.com/yourrepo/prefetch2es
+$ git clone https://github.com/your-username/prefetch2es.git
 $ cd prefetch2es
-
-# create a python envs to working dir
-$ pip install poetry
-$ poetry config virtualenvs.in-project true
-
-# install dependencies
-$ poetry install
-
-# ...edit source code...
-
-# run program
-$ poetry run python src/prefetch2es.py -h
 ```
 
-## Conclusion
-Thank you for your interest in this project.  
-I hope this tool will be useful to you.  
+3. Open in VS Code with Dev Container extension, or use the provided dev container
 
-If you have any typos, refactorings, bad English in the readme (I'm really struggling with this), or anything else, I'd appreciate your help.  
+**Alternative: Local Setup**
 
-Best regards.
+```bash
+$ pip install uv
+$ uv sync --dev
+```
+
+**Editor**: This project is developed using Cursor with custom rules (currently being organized).
+
+### Running Tests
+
+```bash
+$ uv run pytest
+```
+
+### Code Style
+This project uses:
+- **black** for code formatting
+- **flake8** for linting
+- **mypy** for type checking
+
+## Contributing
+### Reporting Issues
+- Use GitHub Issues to report bugs or request features
+
+### Pull Requests
+1. Create a feature branch from `master`
+2. Make your changes
+3. Add tests if applicable
+4. Ensure all tests pass
+5. Submit a pull request
+
+### Guidelines
+- Follow existing code style and patterns
+- Update documentation if needed
+
+## Requirements
+- Python 3.11+
+- Dependencies listed in `pyproject.toml`
+
+## License
+By contributing, you agree that your contributions will be licensed under the LGPLv3+ License.
+
+## Questions?
+Feel free to open an issue for discussion or reach out to the maintainers.
+
+Thank you for contributing! :sushi: :sushi: :sushi: 
