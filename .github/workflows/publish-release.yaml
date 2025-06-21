@@ -1,0 +1,148 @@
+name: publish-release
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.create_tag.outputs.version }}
+    strategy:
+      matrix:
+        python-version: ['3.11']
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: install python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: replace version
+        run: |
+          from pathlib import Path
+          version = [l for l in Path('pyproject.toml').read_text().splitlines() if 'version' in l][0].split(' ')[-1].strip('\"')
+          f = Path('src/prefetch2es/views/BaseView.py')
+          text = f.read_text().replace("get_version('prefetch2es')", f"\'{version}\'")
+          f.write_text(text)
+        shell: python
+
+      - name: Install dependencies
+        run: |
+          pip install uv
+
+      - name: get version
+        id: get_version
+        run: |
+          version=$(cat pyproject.toml | grep version | head -1 | awk -F '"' '{print $2}')
+          echo "version=$version" >> $GITHUB_ENV
+        shell: bash
+
+      - name: run python
+        run: |
+          uv run prefetch2es -h
+          uv run prefetch2es -v
+          uv run prefetch2json -h
+          uv run prefetch2json -v
+      
+      - name: build
+        run: |
+          uv run python -m nuitka --standalone --onefile --follow-imports -o prefetch2es-windows-x64-v$env:version.exe --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2esView.py
+          uv run python -m nuitka --standalone --onefile --follow-imports -o prefetch2json-windows-x64-v$env:version.exe --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2jsonView.py
+      
+      - name: verify
+        run: |
+          dist/prefetch2es-windows-x64-v$version.exe -h
+          dist/prefetch2es-windows-x64-v$version.exe -v
+          dist/prefetch2json-windows-x64-v$version.exe -h
+          dist/prefetch2json-windows-x64-v$version.exe -v
+        shell: bash
+      
+      - name: create tag
+        id: create_tag
+        if: startsWith(github.ref, 'refs/heads/master')
+        run: |
+          version=$(cat pyproject.toml | grep version | head -1 | awk -F '"' '{print $2}')
+          git tag "v$version"
+          git push origin "v$version"
+          echo "version=$version" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+
+      - name: create release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.create_tag.outputs.version }}
+          files: |
+            dist/prefetch2es-windows-x64-v${{ env.version }}.exe
+            dist/prefetch2json-windows-x64-v${{ env.version }}.exe
+          name: Release v${{ steps.create_tag.outputs.version }}
+          body: 'This release was automatically created by GitHub Actions.'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    needs: build-windows
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python-version: ['3.11']
+    env:
+      version: ${{ needs.build-windows.outputs.version }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: install python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: replace version
+        run: |
+          from pathlib import Path
+          version = [l for l in Path('pyproject.toml').read_text().splitlines() if 'version' in l][0].split(' ')[-1].strip('\"')
+          f = Path('src/prefetch2es/views/BaseView.py')
+          text = f.read_text().replace("get_version('prefetch2es')", f"\'{version}\'")
+          f.write_text(text)
+        shell: python
+
+      - name: Install dependencies
+        run: |
+          sudo apt install patchelf build-essential
+          pip install uv
+
+      - name: run python
+        run: |
+          uv run prefetch2es -h
+          uv run prefetch2es -v
+          uv run prefetch2json -h
+          uv run prefetch2json -v
+
+      - name: build
+        run: |
+          pip install nuitka
+          uv run python -m nuitka --standalone --onefile --follow-imports -o prefetch2es-linux-x64-v$version --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2esView.py
+          uv run python -m nuitka --standalone --onefile --follow-imports -o prefetch2json-linux-x64-v$version --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2jsonView.py
+      
+      - name: verify
+        run: |
+          dist/prefetch2es-linux-x64-v$version -h
+          dist/prefetch2es-linux-x64-v$version -v
+          dist/prefetch2json-linux-x64-v$version -h
+          dist/prefetch2json-linux-x64-v$version -v
+
+      - name: upload asset to release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.build-windows.outputs.version }}
+          files: |
+            dist/prefetch2es-linux-x64-v${{ env.version }}
+            dist/prefetch2json-linux-x64-v${{ env.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

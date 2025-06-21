@@ -1,43 +1,41 @@
 # prefetch2es
-[![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
+[![LGPL-3.0 License](http://img.shields.io/badge/license-LGPL--3.0-blue.svg?style=flat)](LICENSE)
 [![PyPI version](https://badge.fury.io/py/prefetch2es.svg)](https://badge.fury.io/py/prefetch2es)
-[![Python Versions](https://img.shields.io/pypi/pyversions/prefetch2es.svg)](https://pypi.org/project/prefetch2es/)
-[![DockerHub Status](https://shields.io/docker/cloud/build/sumeshi/prefetch2es)](https://hub.docker.com/r/sumeshi/prefetch2es)
+[![pytest](https://github.com/sumeshi/prefetch2es/actions/workflows/test.yml/badge.svg)](https://github.com/sumeshi/prefetch2es/actions/workflows/test.yml)
 
 ![prefetch2es logo](https://gist.githubusercontent.com/sumeshi/c2f430d352ae763273faadf9616a29e5/raw/fd3921cb75a484af98d795f194e9e4cb16b88515/prefetch2es.svg)
 
-Fast import of Windows Prefetch(.pf) into Elasticsearch.
+A library for fast parse & import of Windows Prefetch into Elasticsearch.
 
-prefetch2es uses C library [libscca](https://github.com/libyal/libscca).
+**prefetch2es** uses the Python library [pyscca](https://github.com/libyal/libscca/tree/main/pyscca), providing high-performance parsing of Windows Prefetch files.
 
 ## Usage
 
-When using from the commandline interface:
+**prefetch2es** can be executed from the command line or incorporated into a Python script.
 
 ```bash
 $ prefetch2es /path/to/your/file.pf
 ```
 
-When using from the python-script:
-
 ```python
-from prefetch2es.prefetch2es import prefetch2es
+from prefetch2es import prefetch2es
 
 if __name__ == '__main__':
     filepath = '/path/to/your/file.pf'
     prefetch2es(filepath)
 ```
 
-## Arguments
-prefetch2es supports importing from multiple files.
+### Arguments
 
-```
+prefetch2es supports simultaneous import of multiple files.
+
+```bash
 $ prefetch2es file1.pf file2.pf file3.pf
 ```
 
-Also, possible to import recursively from a specific directory.
+It also allows recursive import from the specified directory.
 
-```
+```bash
 $ tree .
 pffiles/
   ├── file1.pf
@@ -49,69 +47,318 @@ pffiles/
       ├── file5.pf
       └── file6.pf
 
-$ prefetch2es /pffiles/ # The Path is recursively expanded to file1~6.pf.
+$ prefetch2es /pffiles/ # The path is recursively expanded to all .pf files.
 ```
 
 ### Options
+
 ```
---host: 
-    ElasticSearch host address
-    (default: localhost)
+--version, -v
 
---port: 
-    ElasticSearch port number
-    (default: 9200)
+--help, -h
 
---index: 
-    Index name
-    (default: prefetch2es)
+--quiet, -q
+  Suppress standard output
+  (default: False)
+
+--multiprocess, -m:
+  Enable multiprocessing for faster execution
+  (default: False)
+
+--size:
+  Chunk size for processing (default: 500)
+
+--host:
+  Elasticsearch host address (default: localhost)
+
+--port:
+  Elasticsearch port number (default: 9200)
+
+--index:
+  Destination index name (default: prefetch2es)
 
 --scheme:
-  Scheme to use (http, or https)
-  (default: http)
+  Protocol scheme to use (http or https) (default: http)
 
---pipeline
-  Elasticsearch Ingest Pipeline to use
+--pipeline:
+  Elasticsearch Ingest Pipeline to use (default: )
+
+--timeline:
+  Enable timeline analysis mode for forensic investigation
+  (default: False)
+
+--tags:
+  Additional tags for timeline records (comma-separated)
   (default: )
 
 --login:
-  The login to use if Elastic Security is enable
-  (default: )
+  The login to use if Elastic Security is enabled (default: )
 
 --pwd:
-  The password linked to the login provided
-  (default: )
-
+  The password associated with the provided login (default: )
 ```
 
-## Examples
+### Examples
 
-When using from the commandline interface:
+When using from the command line:
 
+```bash
+$ prefetch2es /path/to/your/file.pf --host=localhost --port=9200 --index=foobar --size=500
 ```
-$ prefetch2es /path/to/your/file.pf --host=localhost --port=9200 --index=foobar
-```
 
-When using from the python-script:
+When using from a Python script:
 
 ```python
 if __name__ == '__main__':
-    prefetch2es('/path/to/your/file.pf', host=localhost, port=9200, index='foobar')
-```
-
-With the Amazon Elasticsearch Serivce (ES):
-
-```
-$ prefetch2es /path/to/your/file.pf --host=example.us-east-1.es.amazonaws.com --port=443 --scheme=https --index=foobar
+    prefetch2es('/path/to/your/file.pf', host='localhost', port=9200, index='foobar', size=500)
 ```
 
 With credentials for Elastic Security:
 
-```
+```bash
 $ prefetch2es /path/to/your/file.pf --host=localhost --port=9200 --index=foobar --login=elastic --pwd=******
 ```
 
+With timeline analysis mode:
+
+```bash
+$ prefetch2es /path/to/your/file.pf --timeline --index=prefetch-timeline
+```
+
+With custom tags for system identification:
+
+```bash
+# Single tag
+$ prefetch2es /path/to/your/file.pf --timeline --tags="WORKSTATION-01" --index=prefetch-timeline
+
+# Multiple tags (comma-separated)
+$ prefetch2es /path/to/your/file.pf --timeline --tags="WORKSTATION-01,FOO,BAR" --index=prefetch-timeline
+```
+
 Note: The current version does not verify the certificate.
+
+## Appendix
+
+### prefetch2json
+
+An additional feature: :sushi: :sushi: :sushi:
+
+Convert Windows Prefetch to a JSON file.
+
+```bash
+$ prefetch2json /path/to/your/file.pf -o /path/to/output/target.json
+```
+
+Convert Windows Prefetch to a Python List[dict] object.
+
+```python
+from prefetch2es import prefetch2json
+
+if __name__ == '__main__':
+    filepath = '/path/to/your/file.pf'
+    result: List[dict] = prefetch2json(filepath)
+```
+
+With timeline analysis and custom tags:
+
+```bash
+$ prefetch2json /path/to/your/file.pf --timeline --tags="WORKSTATION-01,FINANCE" -o output.json
+```
+
+### Timeline Analysis
+
+prefetch2es supports timeline analysis mode that creates specialized timeline records for forensic investigation.
+
+```bash
+$ prefetch2es /path/to/your/file.pf --timeline --index=prefetch-timeline
+```
+
+This mode creates records optimized for temporal analysis of application execution patterns, making it easier to investigate system activity over time.
+
+#### Tags for System Identification
+
+Use the `--tags` option to add custom tags for better organization and filtering:
+
+```bash
+# Identify source system and department
+$ prefetch2es /path/to/prefetch/ --timeline --tags="WORKSTATION-01" --index=prefetch-timeline
+
+# Add criticality level
+$ prefetch2es /path/to/prefetch/ --timeline --tags="SERVER-02,FOO,BAR" --index=prefetch-timeline
+```
+
+## Output Format Examples
+
+### Standard Mode
+
+```json
+[
+  {
+    "name": "CMD.EXE",
+    "filenames": [
+      "\\VOLUME{01d1217a9c4c6779-8c9f49ec}\\WINDOWS\\SYSTEM32\\DISKPART.EXE",
+      "\\VOLUME{01d12173f395296c-66f451bc}\\CMDER129\\VENDOR\\CLINK\\CLINK_DLL_X64.DLL",
+      "\\VOLUME{01d1217a9c4c6779-8c9f49ec}\\WINDOWS\\SYSTEM32\\NTDLL.DLL",
+      "\\VOLUME{01d1217a9c4c6779-8c9f49ec}\\WINDOWS\\SYSTEM32\\CMD.EXE",
+      ...
+    ],
+    "exec_count": 55,
+    "last_exec_times": [
+      "2016-01-12T20:07:03.981069",
+      "2016-01-10T02:29:02.788726",
+      "2016-01-04T23:27:28.405869",
+      "2016-01-04T23:27:28.726891",
+      "2016-01-04T18:38:10.935655",
+      "2016-01-04T18:38:11.344163",
+      "2015-12-31T21:42:29.667018",
+      "2015-12-17T22:34:21.579861"
+    ],
+    "format_version": 30,
+    "prefetch_hash": "D269B812",
+    "number_of_volumes": 2,
+    "number_of_filenames": 62,
+    "number_of_file_metrics_entries": 62,
+    "metrics": [
+      {
+        "filename": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}\\WINDOWS\\SYSTEM32\\DISKPART.EXE",
+        "file_reference": "0X1000000009EF4"
+      },
+      {
+        "filename": "\\VOLUME{01d12173f395296c-66f451bc}\\CMDER129\\VENDOR\\CLINK\\CLINK_DLL_X64.DLL",
+        "file_reference": "0X100000000B5A6"
+      },
+      {
+        "filename": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}\\WINDOWS\\SYSTEM32\\NTDLL.DLL",
+        "file_reference": "0X10000000575F4"
+      },
+      {
+        "filename": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}\\WINDOWS\\SYSTEM32\\CMD.EXE",
+        "file_reference": "0X1000000009CA8"
+      },
+      ...
+    ],
+    "volumes": [
+      {
+        "path": "\\VOLUME{01d12173f395296c-66f451bc}",
+        "creation_time": "2015-11-17 20:10:06.204964Z",
+        "serial_number": "66F451BC"
+      },
+      {
+        "path": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}",
+        "creation_time": "2015-11-17 20:57:46.243468Z",
+        "serial_number": "8C9F49EC"
+      }
+    ],
+    "source_file": "/workspace/tests/cache/CMD.EXE-D269B812.pf",
+    "tags": [
+      "prefetch"
+    ]
+  },
+  ...
+]
+```
+
+### Timeline Mode
+
+```json
+[
+    {
+    "@timestamp": "2016-01-12 20:07:03.981069Z",
+    "event": {
+      "action": "process-started",
+      "category": "process",
+      "type": "start",
+      "provider": "prefetch"
+    },
+    "process": {
+      "name": "CMD.EXE",
+      "start": "2016-01-12 20:07:03.981069Z",
+      "hash": {
+        "prefetch": "D269B812"
+      }
+    },
+    "file": {
+      "path": "/workspace/tests/cache/CMD.EXE-D269B812.pf",
+      "size": 6298
+    },
+    "windows": {
+      "prefetch": {
+        "exec_count": 55,
+        "last_exec_times": "2016-01-12 20:07:03.981069Z",
+        "hash": {
+          "prefetch": "D269B812"
+        },
+        "format_version": 30,
+        "volumes": {
+          "count": 2,
+          "list": [
+            {
+              "path": "\\VOLUME{01d12173f395296c-66f451bc}",
+              "creation_time": "2015-11-17 20:10:06.204964Z",
+              "serial_number": "66F451BC"
+            },
+            {
+              "path": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}",
+              "creation_time": "2015-11-17 20:57:46.243468Z",
+              "serial_number": "8C9F49EC"
+            }
+          ]
+        },
+        "metrics": {
+          "count": 62,
+          "list": [
+            {
+              "filename": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}\\WINDOWS\\SYSTEM32\\DISKPART.EXE",
+              "file_reference": "0X1000000009EF4"
+            },
+            {
+              "filename": "\\VOLUME{01d12173f395296c-66f451bc}\\CMDER129\\VENDOR\\CLINK\\CLINK_DLL_X64.DLL",
+              "file_reference": "0X100000000B5A6"
+            },
+            {
+              "filename": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}\\WINDOWS\\SYSTEM32\\NTDLL.DLL",
+              "file_reference": "0X10000000575F4"
+            },
+            {
+              "filename": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}\\WINDOWS\\SYSTEM32\\CMD.EXE",
+              "file_reference": "0X1000000009CA8"
+            },
+            ...
+          ]
+        }
+      }
+    },
+    "tags": [
+      "prefetch"
+    ]
+  },
+  ...
+]
+```
+
+## Installation
+
+### from PyPI
+
+```bash
+$ pip install prefetch2es
+```
+
+### from GitHub Releases
+
+The version compiled into a binary using Nuitka is also available for use.
+
+```bash
+$ chmod +x ./prefetch2es
+$ ./prefetch2es {{options...}}
+```
+
+```powershell
+> prefetch2es.exe {{options...}}
+```
+
+Do not use the "latest" image if at all possible.  
+The "latest" image is not a released version, but is built from the contents of the master branch.
 
 ## Supported Prefetch versions
 
@@ -122,99 +369,19 @@ Note: The current version does not verify the certificate.
 - Windows 8.1
 - Windows 10 1809
 - Windows 10 1903
+- Windows 11 24H2
 
-For more information, please visit [libscca](https://github.com/libyal/libscca).
-
-## Appendix
-### prefetch2json
-Extra feature. 🍣 🍣 🍣
-
-Convert from Windows Prefetch to json file.
-
-```
-$ prefetch2json /path/to/your/file.pf /path/to/output/target.json
-```
-
-Convert from Windows Prefetch to Python dict object.
-
-```python
-from prefetch2es import prefetch2json
-
-if __name__ == '__main__':
-  filepath = '/path/to/your/file.pf'
-  result: dict = prefetch2json(filepath)
-```
-
-## Output Format Example
-Using the sample prefetch file of [EricZimmerman/Prefetch](https://github.com/EricZimmerman/Prefetch) as an example.
-
-```
-{
-  "name": "CALC.EXE",
-  "filenames": [
-    "\\DEVICE\\HARDDISKVOLUME2\\WINDOWS\\SYSTEM32\\NTDLL.DLL",
-    ...
-  ],
-  "exec_count": 2,
-  "last_exec_time": 130974496211967500,
-  "format_version": 23,
-  "prefetch_hash": 2013131135,
-  "metrics": [
-    {
-      "filename": "\\DEVICE\\HARDDISKVOLUME2\\WINDOWS\\SYSTEM32\\NTDLL.DLL",
-      "file_reference": 281474976736310
-    },
-    ...
-  ],
-  "volumes": [
-    {
-      "path": "\\DEVICE\\HARDDISKVOLUME2",
-      "creation_time": 130974525181093750,
-      "serial_number": 2281737263
-    }
-  ]
-}
-```
-
-## Installation
-
-### via PyPI
-```
-$ pip install prefetch2es
-```
-
-### via DockerHub
-```
-$ docker pull sumeshi/prefetch2es:latest
-```
-
-## Run with Docker
-https://hub.docker.com/r/sumeshi/prefetch2es
-
-
-## prefetch2es
-```bash
-# "host.docker.internal" is only available in mac and windows environments.
-# For linux, use the --add-host option.
-$ docker run -t --rm -v $(pwd):/app/work sumeshi/prefetch2es:latest prefetch2es /app/work/SAMPLE.pf --host=host.docker.internal
-```
-
-## prefetch2json
-```bash
-$ docker run -t --rm -v $(pwd):/app/work sumeshi/prefetch2es:latest prefetch2es /app/work/SAMPLE.pf /app/work/out.json
-```
-
-Do not use the "latest" image if at all possible.  
-The "latest" image is not a released version, but is built from the contents of the master branch.
+For more information, please visit [libscca](https://github.com/libyal/libscca/blob/main/documentation/Windows%20Prefetch%20File%20(PF)%20format.asciidoc).
 
 ## Contributing
 
-[CONTRIBUTING](https://github.com/sumeshi/prefetch2es/blob/master/CONTRIBUTING.md)
-
-The source code for prefetch2es is hosted at GitHub, and you may download, fork, and review it from this repository(https://github.com/sumeshi/prefetch2es).
+The source code for prefetch2es is hosted on GitHub. You can download, fork, and review it from this repository: https://github.com/sumeshi/prefetch2es.
 Please report issues and feature requests. :sushi: :sushi: :sushi:
 
 ## License
-prefetch2es is released under the [LGPLv3+](https://github.com/sumeshi/prefetch2es/blob/master/LICENSE) License.
 
-Powered by [libscca](https://github.com/libyal/libscca).
+prefetch2es is released under the [LGPL-3.0](https://github.com/sumeshi/prefetch2es/blob/master/LICENSE) License.
+
+Powered by following libraries:
+- [pyscca](https://github.com/libyal/libscca/tree/main/pyscca)
+- [Nuitka](https://github.com/Nuitka/Nuitka)
