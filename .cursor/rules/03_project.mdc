@@ -1,0 +1,133 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# prefetch2es - Project Specific Rules
+
+## Project Overview
+prefetch2es is a Python tool for fast import of Windows Prefetch into Elasticsearch using pyscca library for high performance.
+
+## Technology Stack
+- **Language**: Python 3.11+
+- **Core Dependencies**: 
+  - pyscca (Prefetch parser library)
+  - elasticsearch (Elasticsearch client)
+  - orjson (High-performance JSON library)
+  - tqdm (Progress bar library)
+- **Package Manager**: uv (modern Python package manager)
+- **Development Tools**: pytest, black, mypy, flake8
+
+## Project Structure
+```
+prefetch2es/
+├── src/
+│   └── prefetch2es/
+│       ├── __init__.py           # Main API functions
+│       ├── models/
+│       │   ├── Prefetch2es.py    # Core processing logic
+│       │   ├── ElasticsearchUtils.py  # ES operations
+│       │   └── MetaData.py       # Version management
+│       ├── presenters/
+│       │   ├── Prefetch2esPresenter.py    # ES import logic
+│       │   └── Prefetch2jsonPresenter.py  # JSON export logic
+│       └── views/
+│           ├── BaseView.py       # CLI base class
+│           ├── Prefetch2esView.py    # ES import CLI
+│           └── Prefetch2jsonView.py  # JSON export CLI
+├── tests/                        # Test files
+├── pyproject.toml               # Project configuration
+└── README.md                    # Project documentation
+```
+
+## Domain-Specific Requirements
+
+### Performance Considerations
+- Optimize for large Prefetch file processing
+- Use streaming/chunked processing for memory efficiency
+- Leverage pyscca library for performance
+- Implement progress reporting for long-running operations
+- Support multiprocessing with Python 3.13 compatibility
+- SafeMultiprocessingMixin for cross-version compatibility
+
+### Elasticsearch Integration
+- Support Elasticsearch 9.0+
+- Implement proper index mapping for Windows Prefetch fields
+- Handle connection errors and retries gracefully
+- Support bulk indexing for performance
+- Support custom ingest pipelines
+- Hash-based document IDs to prevent duplicates
+
+### Prefetch Processing Specifics
+- Handle various Prefetch formats correctly
+- Extract comprehensive metadata including:
+  - Executable filename and run count
+  - Multiple execution timestamps (last_exec_times array)
+  - File metrics and volume information
+  - Format version and prefetch hash
+  - Complete filename lists and metrics entries
+- Support recursive directory processing for multiple Prefetch files
+- Handle malformed or corrupted Prefetch files gracefully
+- Process all available pyscca data fields
+
+### CLI Design
+- Provide clear progress indicators with tqdm
+- Support configuration through command-line arguments
+- Implement proper error messages and help text
+- Support both single file and batch processing modes
+- Allow quiet mode for automated processing
+- Timeline mode for specialized forensic analysis
+
+### Data Processing
+- Implement proper JSON serialization for Elasticsearch
+- Handle timestamp conversion and formatting correctly
+- Support custom field mapping and transformation
+- Ensure data integrity during processing
+- Provide both prefetch2es and prefetch2json functionality
+- Timeline mode creates specialized records for temporal analysis
+
+### Security and Authentication
+- Support Elasticsearch authentication (login/password)
+- Handle secure connections (HTTPS)
+- Note: Current version does not verify certificates
+
+## Development Workflow
+- Focus on CLI usability and performance
+- Test with real Prefetch files of various sizes
+- Benchmark performance improvements
+- Document configuration options thoroughly
+- Use modern Python tooling (uv, black, mypy)
+- Maintain Python 3.13 compatibility
+
+---
+
+## AI Assistant Instructions
+
+### Project Context Awareness
+- Always consider the Windows Prefetch processing context
+- Understand the performance-critical nature of the tool
+- Be aware of Elasticsearch indexing requirements
+- Consider CLI user experience in suggestions
+- Remember that Prefetch files contain application execution metadata
+- Understand the modular architecture (models/presenters/views)
+
+### Enhancement Suggestions
+- When suggesting improvements, consider:
+  - Performance impact on large Prefetch file processing
+  - Elasticsearch compatibility
+  - CLI usability and batch processing
+  - Memory efficiency for large sets of prefetch files
+  - Forensic analysis requirements
+  - Timeline mode functionality
+  - Multiprocessing safety across Python versions
+- Always test suggestions with the project's core functionality in mind
+- Consider the forensic analysis use case when making suggestions
+- Respect the MVC-like architecture pattern
+
+### Current Implementation Details
+- Uses pyscca library for Prefetch parsing
+- Extracts multiple execution timestamps per file
+- Supports timeline mode for specialized analysis
+- Implements safe multiprocessing for Python 3.13+
+- Modular architecture with clear separation of concerns
+- Comprehensive error handling and logging
