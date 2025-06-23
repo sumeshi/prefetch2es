@@ -281,10 +281,6 @@ $ prefetch2es /path/to/prefetch/ --timeline --tags="SERVER-02,FOO,BAR" --index=p
       "name": "CMD.EXE",
       "start": "2016-01-12T20:07:03.981069Z"
     },
-    "file": {
-      "path": "/workspace/tests/cache/CMD.EXE-D269B812.pf",
-      "size": 6298
-    },
     "windows": {
       "prefetch": {
         "exec_count": 55,
@@ -323,6 +319,11 @@ $ prefetch2es /path/to/prefetch/ --timeline --tags="SERVER-02,FOO,BAR" --index=p
           },
           ...
         ]
+      }
+    },
+    "log": {
+      "file": {
+        "path": "/workspace/tests/cache/CMD.EXE-D269B812.pf"
       }
     },
     "tags": [

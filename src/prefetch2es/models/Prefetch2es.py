@@ -145,10 +145,6 @@ def process_prefetch_file_timeline(filepath: Path, tags: str) -> List[dict]:
                     "name": p.executable_filename,
                     "start": f"{p.get_last_run_time(i)}Z".replace(' ', 'T'),
                 },
-                "file": {
-                    "path": str(filepath),
-                    "size": filepath.stat().st_size,
-                },
                 "windows": {
                     "prefetch": {
                         "exec_count": p.run_count,
@@ -175,6 +171,7 @@ def process_prefetch_file_timeline(filepath: Path, tags: str) -> List[dict]:
                         ],
                     }
                 },
+                "log": {"file": {"path": str(filepath)}},
                 "tags": base_tags,
             }
         )
