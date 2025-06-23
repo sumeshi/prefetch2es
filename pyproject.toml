@@ -1,6 +1,6 @@
 [project]
 name = "prefetch2es"
-version = "2.2.0"
+version = "2.2.1"
 description = "A library for fast parse & import of Windows Prefetch into Elasticsearch."
 readme = "README.md"
 license = "LGPL-3.0-or-later"
@@ -14,7 +14,7 @@ dependencies = [
     "orjson>=3.10.18",
     "tqdm>=4.67.1",
     "urllib3>=2.5.0",
-    "libscca-python",
+    "libscca-python==20240215",
 ]
 
 [build-system]

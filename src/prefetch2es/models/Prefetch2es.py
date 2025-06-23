@@ -78,7 +78,7 @@ def process_prefetch_file(filepath: Path, tags: str = "") -> dict:
         "filenames": [name for name in p.filenames],
         "exec_count": p.run_count,
         "last_exec_times": [
-            p.get_last_run_time(i) for i in range(p.run_count if p.run_count < 8 else 8)
+            f"{p.get_last_run_time(i)}Z".replace(' ', 'T') for i in range(p.run_count if p.run_count < 8 else 8)
         ],
         "format_version": p.format_version,
         "prefetch_hash": format(p.prefetch_hash, "x").upper(),
@@ -95,7 +95,7 @@ def process_prefetch_file(filepath: Path, tags: str = "") -> dict:
         "volumes": [
             {
                 "path": volume.device_path,
-                "creation_time": f"{volume.get_creation_time()}Z",
+                "creation_time": f"{volume.get_creation_time()}Z".replace(' ', 'T'),
                 "serial_number": format(volume.serial_number, "x").upper(),
             }
             for volume in p.volumes
@@ -129,21 +129,21 @@ def process_prefetch_file_timeline(filepath: Path, tags: str) -> List[dict]:
 
     timeline_records = []
     for i in range(p.run_count if p.run_count < 8 else 8):
-        last_run_time = p.get_last_run_time(i)
-
         timeline_records.append(
             {
-                "@timestamp": f"{last_run_time}Z",
+                "@timestamp": f"{p.get_last_run_time(i)}Z".replace(' ', 'T'),
                 "event": {
-                    "action": "process-started",
-                    "category": "process",
-                    "type": "start",
+                    "action": "prefetch-executed",
+                    "category": ["process"],
+                    "type": ["start"],
+                    "kind": "event",
                     "provider": "prefetch",
+                    "module": "windows",
+                    "dataset": "windows.prefetch",
                 },
                 "process": {
                     "name": p.executable_filename,
-                    "start": f"{last_run_time}Z",
-                    "hash": {"prefetch": format(p.prefetch_hash, "x").upper()},
+                    "start": f"{p.get_last_run_time(i)}Z".replace(' ', 'T'),
                 },
                 "file": {
                     "path": str(filepath),
@@ -152,34 +152,27 @@ def process_prefetch_file_timeline(filepath: Path, tags: str) -> List[dict]:
                 "windows": {
                     "prefetch": {
                         "exec_count": p.run_count,
-                        "last_exec_times": f"{p.get_last_run_time(i)}Z",
                         "hash": {"prefetch": format(p.prefetch_hash, "x").upper()},
                         "format_version": p.format_version,
-                        "volumes": {
-                            "count": p.number_of_volumes,
-                            "list": [
-                                {
-                                    "path": volume.device_path,
-                                    "creation_time": f"{volume.get_creation_time()}Z",
-                                    "serial_number": format(
-                                        volume.serial_number, "x"
-                                    ).upper(),
-                                }
-                                for volume in p.volumes
-                            ],
-                        },
-                        "metrics": {
-                            "count": p.number_of_file_metrics_entries,
-                            "list": [
-                                {
-                                    "filename": metrics.filename,
-                                    "file_reference": hex(
-                                        metrics.file_reference
-                                    ).upper(),
-                                }
-                                for metrics in p.file_metrics_entries
-                            ],
-                        },
+                        "volumes": [
+                            {
+                                "path": volume.device_path,
+                                "creation_time": f"{volume.get_creation_time()}Z".replace(' ', 'T'),
+                                "serial_number": format(
+                                    volume.serial_number, "x"
+                                ).upper(),
+                            }
+                            for volume in p.volumes
+                        ],
+                        "metrics": [
+                            {
+                                "filename": metrics.filename,
+                                "file_reference": hex(
+                                    metrics.file_reference
+                                ).upper(),
+                            }
+                            for metrics in p.file_metrics_entries
+                        ],
                     }
                 },
                 "tags": base_tags,

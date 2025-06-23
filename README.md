@@ -1,7 +1,7 @@
 # prefetch2es
 [![LGPL-3.0 License](http://img.shields.io/badge/license-LGPL--3.0-blue.svg?style=flat)](LICENSE)
 [![PyPI version](https://badge.fury.io/py/prefetch2es.svg)](https://badge.fury.io/py/prefetch2es)
-[![pytest](https://github.com/sumeshi/prefetch2es/actions/workflows/test.yml/badge.svg)](https://github.com/sumeshi/prefetch2es/actions/workflows/test.yml)
+[![pytest](https://github.com/sumeshi/prefetch2es/actions/workflows/test.yaml/badge.svg)](https://github.com/sumeshi/prefetch2es/actions/workflows/test.yaml)
 
 ![prefetch2es logo](https://gist.githubusercontent.com/sumeshi/c2f430d352ae763273faadf9616a29e5/raw/fd3921cb75a484af98d795f194e9e4cb16b88515/prefetch2es.svg)
 
@@ -88,8 +88,8 @@ $ prefetch2es /pffiles/ # The path is recursively expanded to all .pf files.
   (default: False)
 
 --tags:
-  Additional tags for timeline records (comma-separated)
-  (default: )
+  Comma-separated tags to add to each record for identification
+  (e.g., hostname, domain name) (default: )
 
 --login:
   The login to use if Elastic Security is enabled (default: )
@@ -204,14 +204,14 @@ $ prefetch2es /path/to/prefetch/ --timeline --tags="SERVER-02,FOO,BAR" --index=p
     ],
     "exec_count": 55,
     "last_exec_times": [
-      "2016-01-12T20:07:03.981069",
-      "2016-01-10T02:29:02.788726",
-      "2016-01-04T23:27:28.405869",
-      "2016-01-04T23:27:28.726891",
-      "2016-01-04T18:38:10.935655",
-      "2016-01-04T18:38:11.344163",
-      "2015-12-31T21:42:29.667018",
-      "2015-12-17T22:34:21.579861"
+      "2016-01-12T20:07:03.981069Z",
+      "2016-01-10T02:29:02.788726Z",
+      "2016-01-04T23:27:28.405869Z",
+      "2016-01-04T23:27:28.726891Z",
+      "2016-01-04T18:38:10.935655Z",
+      "2016-01-04T18:38:11.344163Z",
+      "2015-12-31T21:42:29.667018Z",
+      "2015-12-17T22:34:21.579861Z"
     ],
     "format_version": 30,
     "prefetch_hash": "D269B812",
@@ -240,12 +240,12 @@ $ prefetch2es /path/to/prefetch/ --timeline --tags="SERVER-02,FOO,BAR" --index=p
     "volumes": [
       {
         "path": "\\VOLUME{01d12173f395296c-66f451bc}",
-        "creation_time": "2015-11-17 20:10:06.204964Z",
+        "creation_time": "2015-11-17T20:10:06.204964Z",
         "serial_number": "66F451BC"
       },
       {
         "path": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}",
-        "creation_time": "2015-11-17 20:57:46.243468Z",
+        "creation_time": "2015-11-17T20:57:46.243468Z",
         "serial_number": "8C9F49EC"
       }
     ],
@@ -262,20 +262,24 @@ $ prefetch2es /path/to/prefetch/ --timeline --tags="SERVER-02,FOO,BAR" --index=p
 
 ```json
 [
-    {
-    "@timestamp": "2016-01-12 20:07:03.981069Z",
+  {
+    "@timestamp": "2016-01-12T20:07:03.981069Z",
     "event": {
-      "action": "process-started",
-      "category": "process",
-      "type": "start",
-      "provider": "prefetch"
+      "action": "prefetch-executed",
+      "category": [
+        "process"
+      ],
+      "type": [
+        "start"
+      ],
+      "kind": "event",
+      "provider": "prefetch",
+      "module": "windows",
+      "dataset": "windows.prefetch"
     },
     "process": {
       "name": "CMD.EXE",
-      "start": "2016-01-12 20:07:03.981069Z",
-      "hash": {
-        "prefetch": "D269B812"
-      }
+      "start": "2016-01-12T20:07:03.981069Z"
     },
     "file": {
       "path": "/workspace/tests/cache/CMD.EXE-D269B812.pf",
@@ -284,48 +288,41 @@ $ prefetch2es /path/to/prefetch/ --timeline --tags="SERVER-02,FOO,BAR" --index=p
     "windows": {
       "prefetch": {
         "exec_count": 55,
-        "last_exec_times": "2016-01-12 20:07:03.981069Z",
         "hash": {
           "prefetch": "D269B812"
         },
         "format_version": 30,
-        "volumes": {
-          "count": 2,
-          "list": [
-            {
-              "path": "\\VOLUME{01d12173f395296c-66f451bc}",
-              "creation_time": "2015-11-17 20:10:06.204964Z",
-              "serial_number": "66F451BC"
-            },
-            {
-              "path": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}",
-              "creation_time": "2015-11-17 20:57:46.243468Z",
-              "serial_number": "8C9F49EC"
-            }
-          ]
-        },
-        "metrics": {
-          "count": 62,
-          "list": [
-            {
-              "filename": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}\\WINDOWS\\SYSTEM32\\DISKPART.EXE",
-              "file_reference": "0X1000000009EF4"
-            },
-            {
-              "filename": "\\VOLUME{01d12173f395296c-66f451bc}\\CMDER129\\VENDOR\\CLINK\\CLINK_DLL_X64.DLL",
-              "file_reference": "0X100000000B5A6"
-            },
-            {
-              "filename": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}\\WINDOWS\\SYSTEM32\\NTDLL.DLL",
-              "file_reference": "0X10000000575F4"
-            },
-            {
-              "filename": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}\\WINDOWS\\SYSTEM32\\CMD.EXE",
-              "file_reference": "0X1000000009CA8"
-            },
-            ...
-          ]
-        }
+        "volumes": [
+          {
+            "path": "\\VOLUME{01d12173f395296c-66f451bc}",
+            "creation_time": "2015-11-17T20:10:06.204964Z",
+            "serial_number": "66F451BC"
+          },
+          {
+            "path": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}",
+            "creation_time": "2015-11-17T20:57:46.243468Z",
+            "serial_number": "8C9F49EC"
+          }
+        ],
+        "metrics": [
+          {
+            "filename": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}\\WINDOWS\\SYSTEM32\\DISKPART.EXE",
+            "file_reference": "0X1000000009EF4"
+          },
+          {
+            "filename": "\\VOLUME{01d12173f395296c-66f451bc}\\CMDER129\\VENDOR\\CLINK\\CLINK_DLL_X64.DLL",
+            "file_reference": "0X100000000B5A6"
+          },
+          {
+            "filename": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}\\WINDOWS\\SYSTEM32\\NTDLL.DLL",
+            "file_reference": "0X10000000575F4"
+          },
+          {
+            "filename": "\\VOLUME{01d1217a9c4c6779-8c9f49ec}\\WINDOWS\\SYSTEM32\\CMD.EXE",
+            "file_reference": "0X1000000009CA8"
+          },
+          ...
+        ]
       }
     },
     "tags": [

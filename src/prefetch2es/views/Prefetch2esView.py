@@ -48,7 +48,7 @@ class Prefetch2esView(BaseView):
         self.parser.add_argument(
             "--tags",
             default="",
-            help="Additional tags for timeline records (comma-separated)",
+            help="Comma-separated tags to add to each record for identification (e.g., hostname, domain name)",
         )
 
     def __list_prefetch_files(self, prefetch_files: List[str]) -> List[Path]:
