@@ -55,6 +55,20 @@ def generate_chunks(chunk_size: int, iterable: Iterable) -> Generator:
         piece = list(islice(i, chunk_size))
 
 
+def safe_last_run_times(p: pyscca.file) -> List[str]:
+    """Read available last-run timestamps without trusting run_count."""
+    times = []
+    for i in range(8):
+        try:
+            value = p.get_last_run_time(i)
+        except OSError:
+            break
+        if not value:
+            break
+        times.append(f"{value}Z".replace(" ", "T"))
+    return times
+
+
 def process_prefetch_file(filepath: Path, tags: str = "") -> dict:
     """Process a single prefetch file and return its data.
 
@@ -65,47 +79,46 @@ def process_prefetch_file(filepath: Path, tags: str = "") -> dict:
         dict: Prefetch file data
     """
     p = pyscca.file()
-    p.open_file_object(filepath.open(mode="rb"))
+    with filepath.open(mode="rb") as file_object:
+        p.open_file_object(file_object)
+        try:
+            # Parse tags from comma-separated string
+            additional_tags = (
+                [tag.strip() for tag in tags.split(",") if tag.strip()] if tags else []
+            )
+            base_tags = ["prefetch"] + additional_tags
+            last_exec_times = safe_last_run_times(p)
 
-    # Parse tags from comma-separated string
-    additional_tags = (
-        [tag.strip() for tag in tags.split(",") if tag.strip()] if tags else []
-    )
-    base_tags = ["prefetch"] + additional_tags
-
-    result = {
-        "name": p.executable_filename,
-        "filenames": [name for name in p.filenames],
-        "exec_count": p.run_count,
-        "last_exec_times": [
-            f"{p.get_last_run_time(i)}Z".replace(' ', 'T') for i in range(p.run_count if p.run_count < 8 else 8)
-        ],
-        "format_version": p.format_version,
-        "prefetch_hash": format(p.prefetch_hash, "x").upper(),
-        "number_of_volumes": p.number_of_volumes,
-        "number_of_filenames": p.number_of_filenames,
-        "number_of_file_metrics_entries": p.number_of_file_metrics_entries,
-        "metrics": [
-            {
-                "filename": metrics.filename,
-                "file_reference": hex(metrics.file_reference).upper(),
+            return {
+                "name": p.executable_filename,
+                "filenames": [name for name in p.filenames],
+                "exec_count": p.run_count,
+                "last_exec_times": last_exec_times,
+                "format_version": p.format_version,
+                "prefetch_hash": format(p.prefetch_hash, "x").upper(),
+                "number_of_volumes": p.number_of_volumes,
+                "number_of_filenames": p.number_of_filenames,
+                "number_of_file_metrics_entries": p.number_of_file_metrics_entries,
+                "metrics": [
+                    {
+                        "filename": metrics.filename,
+                        "file_reference": hex(metrics.file_reference).upper(),
+                    }
+                    for metrics in p.file_metrics_entries
+                ],
+                "volumes": [
+                    {
+                        "path": volume.device_path,
+                        "creation_time": f"{volume.get_creation_time()}Z".replace(' ', 'T'),
+                        "serial_number": format(volume.serial_number, "x").upper(),
+                    }
+                    for volume in p.volumes
+                ],
+                "source_file": str(filepath),
+                "tags": base_tags,
             }
-            for metrics in p.file_metrics_entries
-        ],
-        "volumes": [
-            {
-                "path": volume.device_path,
-                "creation_time": f"{volume.get_creation_time()}Z".replace(' ', 'T'),
-                "serial_number": format(volume.serial_number, "x").upper(),
-            }
-            for volume in p.volumes
-        ],
-        "source_file": str(filepath),
-        "tags": base_tags,
-    }
-
-    p.close()
-    return result
+        finally:
+            p.close()
 
 
 def process_prefetch_file_timeline(filepath: Path, tags: str) -> List[dict]:
@@ -119,65 +132,70 @@ def process_prefetch_file_timeline(filepath: Path, tags: str) -> List[dict]:
         List[dict]: Timeline-formatted prefetch file data.
     """
     p = pyscca.file()
-    p.open_file_object(filepath.open(mode="rb"))
+    with filepath.open(mode="rb") as file_object:
+        p.open_file_object(file_object)
+        try:
+            # Parse tags from comma-separated string
+            additional_tags = (
+                [tag.strip() for tag in tags.split(",") if tag.strip()] if tags else []
+            )
+            base_tags = ["prefetch"] + additional_tags
+            last_exec_times = safe_last_run_times(p)
 
-    # Parse tags from comma-separated string
-    additional_tags = (
-        [tag.strip() for tag in tags.split(",") if tag.strip()] if tags else []
-    )
-    base_tags = ["prefetch"] + additional_tags
-
-    timeline_records = []
-    for i in range(p.run_count if p.run_count < 8 else 8):
-        timeline_records.append(
-            {
-                "@timestamp": f"{p.get_last_run_time(i)}Z".replace(' ', 'T'),
-                "event": {
-                    "action": "prefetch-executed",
-                    "category": ["process"],
-                    "type": ["start"],
-                    "kind": "event",
-                    "provider": "prefetch",
-                    "module": "windows",
-                    "dataset": "windows.prefetch",
-                },
-                "process": {
-                    "name": p.executable_filename,
-                    "start": f"{p.get_last_run_time(i)}Z".replace(' ', 'T'),
-                },
-                "windows": {
-                    "prefetch": {
-                        "exec_count": p.run_count,
-                        "hash": {"prefetch": format(p.prefetch_hash, "x").upper()},
-                        "format_version": p.format_version,
-                        "volumes": [
-                            {
-                                "path": volume.device_path,
-                                "creation_time": f"{volume.get_creation_time()}Z".replace(' ', 'T'),
-                                "serial_number": format(
-                                    volume.serial_number, "x"
-                                ).upper(),
+            timeline_records = []
+            for exec_time in last_exec_times:
+                timeline_records.append(
+                    {
+                        "@timestamp": exec_time,
+                        "event": {
+                            "action": "prefetch-executed",
+                            "category": ["process"],
+                            "type": ["start"],
+                            "kind": "event",
+                            "provider": "prefetch",
+                            "module": "windows",
+                            "dataset": "windows.prefetch",
+                        },
+                        "process": {
+                            "name": p.executable_filename,
+                            "start": exec_time,
+                        },
+                        "windows": {
+                            "prefetch": {
+                                "exec_count": p.run_count,
+                                "hash": {
+                                    "prefetch": format(p.prefetch_hash, "x").upper()
+                                },
+                                "format_version": p.format_version,
+                                "volumes": [
+                                    {
+                                        "path": volume.device_path,
+                                        "creation_time": f"{volume.get_creation_time()}Z".replace(' ', 'T'),
+                                        "serial_number": format(
+                                            volume.serial_number, "x"
+                                        ).upper(),
+                                    }
+                                    for volume in p.volumes
+                                ],
+                                "metrics": [
+                                    {
+                                        "filename": metrics.filename,
+                                        "file_reference": hex(
+                                            metrics.file_reference
+                                        ).upper(),
+                                    }
+                                    for metrics in p.file_metrics_entries
+                                ],
                             }
-                            for volume in p.volumes
-                        ],
-                        "metrics": [
-                            {
-                                "filename": metrics.filename,
-                                "file_reference": hex(
-                                    metrics.file_reference
-                                ).upper(),
-                            }
-                            for metrics in p.file_metrics_entries
-                        ],
+                        },
+                        "log": {"file": {"path": str(filepath)}},
+                        "tags": base_tags,
                     }
-                },
-                "log": {"file": {"path": str(filepath)}},
-                "tags": base_tags,
-            }
-        )
+                )
 
-    p.close()
-    return timeline_records
+            return timeline_records
+        finally:
+            p.close()
 
 
 def process_prefetch_chunk(filepaths: List[Path]) -> List[dict]:
@@ -192,7 +210,7 @@ def process_prefetch_chunk(filepaths: List[Path]) -> List[dict]:
     return [process_prefetch_file(filepath) for filepath in filepaths]
 
 
-def process_timeline_prefetch_chunk(filepaths: List[Path]) -> List[dict]:
+def process_timeline_prefetch_chunk(filepaths: List[Path], tags: str = "") -> List[dict]:
     """Process a chunk of prefetch files for timeline analysis.
 
     Args:
@@ -203,7 +221,7 @@ def process_timeline_prefetch_chunk(filepaths: List[Path]) -> List[dict]:
     """
     result = []
     for filepath in filepaths:
-        timeline_records = process_prefetch_file_timeline(filepath, tags="")
+        timeline_records = process_prefetch_file_timeline(filepath, tags)
         result.extend(timeline_records)
     return result
 
