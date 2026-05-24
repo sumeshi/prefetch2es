@@ -1,5 +1,5 @@
 # prefetch2es
-[![LGPL-3.0 License](http://img.shields.io/badge/license-LGPL--3.0-blue.svg?style=flat)](LICENSE)
+[![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
 [![PyPI version](https://badge.fury.io/py/prefetch2es.svg)](https://badge.fury.io/py/prefetch2es)
 [![pytest](https://github.com/sumeshi/prefetch2es/actions/workflows/test.yaml/badge.svg)](https://github.com/sumeshi/prefetch2es/actions/workflows/test.yaml)
 
@@ -378,7 +378,7 @@ Please report issues and feature requests. :sushi: :sushi: :sushi:
 
 ## License
 
-prefetch2es is released under the [LGPL-3.0](https://github.com/sumeshi/prefetch2es/blob/master/LICENSE) License.
+prefetch2es is released under the [MIT](https://github.com/sumeshi/prefetch2es/blob/master/LICENSE) License.
 
 Powered by following libraries:
 - [pyscca](https://github.com/libyal/libscca/tree/main/pyscca)
