@@ -1,6 +1,7 @@
 # coding: utf-8
 import sys
 import os
+from datetime import datetime
 from itertools import chain
 from pathlib import Path
 from typing import List, Generator, Iterable, Dict, Union
@@ -10,6 +11,9 @@ from functools import partial
 
 
 import pyscca
+
+
+FILETIME_ZERO = datetime(1601, 1, 1, 0, 0, 0)
 
 
 class SafeMultiprocessingMixin:
@@ -63,8 +67,8 @@ def safe_last_run_times(p: pyscca.file) -> List[str]:
             value = p.get_last_run_time(i)
         except OSError:
             break
-        if not value:
-            break
+        if value is None or value == FILETIME_ZERO:
+            continue
         times.append(f"{value}Z".replace(" ", "T"))
     return times
 

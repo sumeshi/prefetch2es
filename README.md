@@ -5,9 +5,40 @@
 
 ![prefetch2es logo](https://gist.githubusercontent.com/sumeshi/c2f430d352ae763273faadf9616a29e5/raw/fd3921cb75a484af98d795f194e9e4cb16b88515/prefetch2es.svg)
 
-A library for fast parse & import of Windows Prefetch into Elasticsearch.
+A command-line tool for parsing Windows Prefetch files and importing the results into Elasticsearch.
 
-**prefetch2es** uses the Python library [pyscca](https://github.com/libyal/libscca/tree/main/pyscca), providing high-performance parsing of Windows Prefetch files.
+**prefetch2es** is built on [pyscca](https://github.com/libyal/libscca/tree/main/pyscca) and converts Windows Prefetch artifacts into Elasticsearch-friendly records.
+
+## Features
+
+- Parse Windows Prefetch (`.pf`) files using pyscca
+- Process a single file, multiple files, or a directory of `.pf` files
+- Import parsed records into Elasticsearch (`prefetch2es`)
+- Export parsed records as JSON (`prefetch2json`)
+- Generate timeline-oriented records for forensic analysis (`--timeline`)
+
+
+## Installation
+
+### From PyPI
+
+```bash
+$ pip install prefetch2es
+```
+
+### From GitHub Releases
+
+Standalone binaries built with Nuitka are available from GitHub Releases.
+
+```bash
+$ chmod +x ./prefetch2es
+$ ./prefetch2es {{options...}}
+```
+
+```powershell
+> prefetch2es.exe {{options...}}
+```
+
 
 ## Usage
 
@@ -19,21 +50,18 @@ $ prefetch2es /path/to/your/file.pf
 
 ```python
 from prefetch2es import prefetch2es
-
-if __name__ == '__main__':
-    filepath = '/path/to/your/file.pf'
-    prefetch2es(filepath)
+prefetch2es("/path/to/your/file.pf")
 ```
 
 ### Arguments
 
-prefetch2es supports simultaneous import of multiple files.
+prefetch2es can process multiple files at once.
 
 ```bash
 $ prefetch2es file1.pf file2.pf file3.pf
 ```
 
-It also allows recursive import from the specified directory.
+prefetch2es can recursively process all `.pf` files under a specified directory.
 
 ```bash
 $ tree .
@@ -66,7 +94,7 @@ $ prefetch2es /pffiles/ # The path is recursively expanded to all .pf files.
   (default: False)
 
 --size:
-  Chunk size for processing (default: 500)
+  Number of files to process per chunk (default: 500)
 
 --host:
   Elasticsearch host address (default: localhost)
@@ -92,10 +120,10 @@ $ prefetch2es /pffiles/ # The path is recursively expanded to all .pf files.
   (e.g., hostname, domain name) (default: )
 
 --login:
-  The login to use if Elastic Security is enabled (default: )
+  Username for Elasticsearch authentication
 
 --pwd:
-  The password associated with the provided login (default: )
+  Password for Elasticsearch authentication
 ```
 
 ### Examples
@@ -135,7 +163,8 @@ $ prefetch2es /path/to/your/file.pf --timeline --tags="WORKSTATION-01" --index=p
 $ prefetch2es /path/to/your/file.pf --timeline --tags="WORKSTATION-01,FOO,BAR" --index=prefetch-timeline
 ```
 
-Note: The current version does not verify the certificate.
+> [!WARNING]
+> TLS certificate verification is currently disabled for Elasticsearch connections. Do not use HTTPS connections over untrusted networks or with production Elasticsearch clusters unless you understand the risk.
 
 ## Appendix
 
@@ -143,7 +172,7 @@ Note: The current version does not verify the certificate.
 
 An additional feature: :sushi: :sushi: :sushi:
 
-Convert Windows Prefetch to a JSON file.
+Convert Windows Prefetch files to a Python `List[dict]` object.
 
 ```bash
 $ prefetch2json /path/to/your/file.pf -o /path/to/output/target.json
@@ -168,6 +197,9 @@ $ prefetch2json /path/to/your/file.pf --timeline --tags="WORKSTATION-01,FINANCE"
 ### Timeline Analysis
 
 prefetch2es supports timeline analysis mode that creates specialized timeline records for forensic investigation.
+
+Standard mode creates one record per Prefetch file.
+Timeline mode creates one record per recorded execution timestamp.
 
 ```bash
 $ prefetch2es /path/to/your/file.pf --timeline --index=prefetch-timeline
@@ -334,30 +366,6 @@ $ prefetch2es /path/to/prefetch/ --timeline --tags="SERVER-02,FOO,BAR" --index=p
 ]
 ```
 
-## Installation
-
-### from PyPI
-
-```bash
-$ pip install prefetch2es
-```
-
-### from GitHub Releases
-
-The version compiled into a binary using Nuitka is also available for use.
-
-```bash
-$ chmod +x ./prefetch2es
-$ ./prefetch2es {{options...}}
-```
-
-```powershell
-> prefetch2es.exe {{options...}}
-```
-
-Do not use the "latest" image if at all possible.  
-The "latest" image is not a released version, but is built from the contents of the master branch.
-
 ## Supported Prefetch versions
 
 - Windows XP
@@ -380,6 +388,6 @@ Please report issues and feature requests. :sushi: :sushi: :sushi:
 
 prefetch2es is released under the [MIT](https://github.com/sumeshi/prefetch2es/blob/master/LICENSE) License.
 
-Powered by following libraries:
+Powered by the following libraries:
 - [pyscca](https://github.com/libyal/libscca/tree/main/pyscca)
 - [Nuitka](https://github.com/Nuitka/Nuitka)

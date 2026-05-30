@@ -54,7 +54,7 @@ def test__prefetch2json_convert(monkeypatch):
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         p2j()
-    assert calc_md5(Path(path)) == "c5c63abb890bdbd72f5ed1237a108ab2"
+    assert calc_md5(Path(path)) == "943a523e2fd027b14194fecb550aef1e"
 
 def test__prefetch2json_convert_multiprocessing(monkeypatch):
     path = 'tests/cache/prefetches-m.json'
@@ -62,7 +62,7 @@ def test__prefetch2json_convert_multiprocessing(monkeypatch):
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         p2j()
-    assert calc_md5(Path(path)) == "c5c63abb890bdbd72f5ed1237a108ab2"
+    assert calc_md5(Path(path)) == "943a523e2fd027b14194fecb550aef1e"
 
 def test__prefetch2json_timeline_convert(monkeypatch):
     path = 'tests/cache/prefetches-t.json'
@@ -70,7 +70,7 @@ def test__prefetch2json_timeline_convert(monkeypatch):
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         p2j()
-    assert calc_md5(Path(path)) == "5ad06fe5ec524c940e8037248ed59e60"
+    assert calc_md5(Path(path)) == "6b9961d15ef94ad3c3eeeffa6d34adc1"
 
 def test__prefetch2json_timeline_convert_multiprocessing(monkeypatch):
     path = 'tests/cache/prefetches-t-m.json'
@@ -78,4 +78,4 @@ def test__prefetch2json_timeline_convert_multiprocessing(monkeypatch):
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         p2j()
-    assert calc_md5(Path(path)) == "5ad06fe5ec524c940e8037248ed59e60"
+    assert calc_md5(Path(path)) == "6b9961d15ef94ad3c3eeeffa6d34adc1"
