@@ -388,6 +388,13 @@ Please report issues and feature requests. :sushi: :sushi: :sushi:
 
 prefetch2es is released under the [MIT](https://github.com/sumeshi/prefetch2es/blob/master/LICENSE) License.
 
-Powered by the following libraries:
-- [pyscca](https://github.com/libyal/libscca/tree/main/pyscca)
-- [Nuitka](https://github.com/Nuitka/Nuitka)
+### Third-party licenses
+
+The standalone binaries distributed via GitHub Releases bundle [libscca / pyscca](https://github.com/libyal/libscca),
+which is licensed under the [GNU Lesser General Public License v3.0 or later (LGPL-3.0-or-later)](https://www.gnu.org/licenses/lgpl-3.0.html).
+
+- Upstream source: https://github.com/libyal/libscca
+- Bundled version: [`libscca-python==20260527`](https://pypi.org/project/libscca-python/20260527/) (source: https://github.com/libyal/libscca/releases/tag/20260527)
+- License text: https://github.com/libyal/libscca/blob/main/COPYING.LESSER
+
+You may obtain, modify, and rebuild libscca from the upstream source above in accordance with the LGPL.

@@ -12,7 +12,7 @@ jobs:
       version: ${{ steps.create_tag.outputs.version }}
     strategy:
       matrix:
-        python-version: ['3.11']
+        python-version: ['3.13']
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        python-version: ['3.11']
+        python-version: ['3.13']
     env:
       version: ${{ needs.build-windows.outputs.version }}
     steps:

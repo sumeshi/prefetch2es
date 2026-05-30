@@ -55,11 +55,8 @@ This project uses:
 - Update documentation if needed
 
 ## Requirements
-- Python 3.11+
+- Python 3.13+
 - Dependencies listed in `pyproject.toml`
-
-## License
-By contributing, you agree that your contributions will be licensed under the LGPLv3+ License.
 
 ## Questions?
 Feel free to open an issue for discussion or reach out to the maintainers.
