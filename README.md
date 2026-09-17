@@ -14,7 +14,7 @@ A command-line tool for parsing Windows Prefetch files and importing the results
 - Parse Windows Prefetch (`.pf`) files using pyscca
 - Process a single file, multiple files, or a directory of `.pf` files
 - Import parsed records into Elasticsearch (`prefetch2es`)
-- Export parsed records as JSON (`prefetch2json`)
+- Export parsed records as JSON or JSONL (`prefetch2json`)
 - Generate timeline-oriented records for forensic analysis (`--timeline`)
 
 
@@ -90,7 +90,7 @@ $ prefetch2es /pffiles/ # The path is recursively expanded to all .pf files.
   (default: False)
 
 --multiprocess, -m:
-  Enable multiprocessing for faster execution
+  Enable multiprocessing for faster processing.
   (default: False)
 
 --size:
@@ -109,7 +109,7 @@ $ prefetch2es /pffiles/ # The path is recursively expanded to all .pf files.
   Protocol scheme to use (http or https) (default: http)
 
 --pipeline:
-  Elasticsearch Ingest Pipeline to use (default: )
+  Elasticsearch ingest pipeline to use (default: )
 
 --timeline:
   Enable timeline analysis mode for forensic investigation
@@ -124,6 +124,12 @@ $ prefetch2es /pffiles/ # The path is recursively expanded to all .pf files.
 
 --pwd:
   Password for Elasticsearch authentication
+
+--no-verify-certs:
+  Disable TLS certificate verification (default: False)
+
+--ca-certs:
+  Path to a CA certificate bundle for TLS verification (default: None)
 ```
 
 ### Examples
@@ -141,7 +147,7 @@ if __name__ == '__main__':
     prefetch2es('/path/to/your/file.pf', host='localhost', port=9200, index='foobar', size=500)
 ```
 
-With credentials for Elastic Security:
+With Elasticsearch authentication:
 
 ```bash
 $ prefetch2es /path/to/your/file.pf --host=localhost --port=9200 --index=foobar --login=elastic --pwd=******
@@ -164,28 +170,37 @@ $ prefetch2es /path/to/your/file.pf --timeline --tags="WORKSTATION-01,FOO,BAR" -
 ```
 
 > [!WARNING]
-> TLS certificate verification is currently disabled for Elasticsearch connections. Do not use HTTPS connections over untrusted networks or with production Elasticsearch clusters unless you understand the risk.
+> TLS certificate verification is enabled by default. Use `--no-verify-certs` only
+> when connecting to a trusted cluster with a self-signed or otherwise
+> unverifiable certificate. Use `--ca-certs /path/to/ca.pem` to provide a
+> private CA bundle while keeping verification enabled.
 
 ## Appendix
 
 ### prefetch2json
 
-An additional feature: :sushi: :sushi: :sushi:
-
-Convert Windows Prefetch files to a Python `List[dict]` object.
+`prefetch2json` converts Windows Prefetch files to JSON.
 
 ```bash
 $ prefetch2json /path/to/your/file.pf -o /path/to/output/target.json
 ```
 
-Convert Windows Prefetch to a Python List[dict] object.
+`prefetch2json` also supports line-delimited output. `--format jsonl` (or
+`ndjson`) writes one record per line without holding the entire dataset in
+memory. When no output path is specified, the default extension is `.jsonl`:
+
+```bash
+$ prefetch2json /path/to/your/file.pf --format jsonl
+```
+
+You can also convert Windows Prefetch files directly into a Python `list[dict]`:
 
 ```python
 from prefetch2es import prefetch2json
 
 if __name__ == '__main__':
     filepath = '/path/to/your/file.pf'
-    result: List[dict] = prefetch2json(filepath)
+    result: list[dict] = prefetch2json(filepath)
 ```
 
 With timeline analysis and custom tags:

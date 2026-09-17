@@ -6,7 +6,7 @@ from prefetch2es.models.Prefetch2es import Prefetch2es
 from prefetch2es.presenters.Prefetch2esPresenter import Prefetch2esPresenter
 
 
-# for use via python-script!
+# Public Python API.
 
 
 def prefetch2es(
@@ -23,44 +23,44 @@ def prefetch2es(
     timeline_mode: bool = False,
     tags: str = "",
 ) -> None:
-    """Fast import of Windows Prefetch into Elasticsearch.
+    """Import Windows Prefetch records into Elasticsearch.
     Args:
         input_path (str):
-            Windows Prefetch files or directory to import into Elasticsearch.
+            Windows Prefetch files or a directory to import into Elasticsearch.
 
         host (str, optional):
             Elasticsearch host address. Defaults to "localhost".
 
         port (int, optional):
-            Elasticsearch port number. Defaults to 9200.
+            Elasticsearch port. Defaults to 9200.
 
         index (str, optional):
             Name of the index to create. Defaults to "prefetch2es".
 
         scheme (str, optional):
-            Elasticsearch address scheme. Defaults to "http".
+            Connection scheme. Defaults to "http".
 
         pipeline (str, optional):
-            Elasticsearch Ingest Pipeline. Defaults to "".
+            Elasticsearch ingest pipeline. Defaults to "".
 
         login (str, optional):
-            Elasticsearch login to connect into.
+            Elasticsearch username.
 
         pwd (str, optional):
-            Elasticsearch password associated with the login provided.
+            Password for Elasticsearch authentication.
 
         multiprocess (bool, optional):
-            Flag to run multiprocessing.
+            Enable multiprocessing.
 
         chunk_size (int, optional):
-            Size of the chunk to be processed for each process.
+            Number of files to process in each chunk.
 
         timeline_mode (bool, optional):
-            Enable timeline analysis mode - creates specialized records
-            for Prefetch timeline analysis.
+            Enable timeline analysis mode and create specialized timeline
+            records for Prefetch execution events.
 
         tags (str, optional):
-            Additional tags for timeline records (comma-separated).
+            Additional comma-separated tags for timeline records.
     """
 
     Prefetch2esPresenter(
@@ -87,14 +87,14 @@ def prefetch2json(
     timeline_mode: bool = False,
     tags: str = "",
 ) -> List[dict]:
-    """Convert Windows Prefetch to List[dict].
+    """Convert Windows Prefetch files to a list of dictionaries.
 
     Args:
         filepath (str): Input Prefetch file or directory.
         multiprocess (bool): Flag to run multiprocessing.
-        chunk_size (int): Size of the chunk to be processed for each process.
-        timeline_mode (bool): Enable timeline analysis mode - creates specialized records.
-        tags (str): Additional tags for timeline records (comma-separated).
+        chunk_size (int): Number of files to process in each chunk.
+        timeline_mode (bool): Enable timeline analysis mode.
+        tags (str): Additional comma-separated tags for timeline records.
 
     Note:
         Since the content of the file is loaded into memory at once,

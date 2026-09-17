@@ -1,4 +1,6 @@
 # coding: utf-8
+import sys
+from pathlib import Path
 from multiprocessing import cpu_count
 
 from prefetch2es.views.BaseView import BaseView
@@ -14,32 +16,50 @@ class Prefetch2jsonView(BaseView):
 
     def define_options(self):
         self.parser.add_argument(
-            "prefetch_file", type=str, help="Windows Prefetch file (.pf) to input."
+            "--format",
+            choices=("json", "jsonl", "ndjson"),
+            default="json",
+            help=(
+                "Output format (default: json). "
+                "JSONL/NDJSON writes one record per line."
+            ),
+        )
+        self.parser.add_argument(
+            "prefetch_file",
+            type=str,
+            help="Input Windows Prefetch file (.pf) or directory.",
         )
         self.parser.add_argument(
             "--output-file",
             "-o",
             type=str,
             default="",
-            help="json file path to output.",
+            help="Output file path.",
         )
         self.parser.add_argument(
             "--timeline",
             action="store_true",
-            help="Enable timeline analysis mode (separates records by type)",
+            help="Enable timeline analysis mode (separate records by type).",
         )
         self.parser.add_argument(
             "--tags",
             default="",
-            help="Additional tags for timeline records (comma-separated)",
+            help="Additional comma-separated tags for timeline records.",
         )
 
     def run(self):
-        view = Prefetch2jsonView()
+        view = self
+        source = Path(self.args.prefetch_file)
+        if not source.is_file() and not source.is_dir():
+            self.parser.error(
+                f"Input path does not exist or is not a file/directory: {source}"
+            )
+        if source.is_dir() and not any(p.is_file() for p in source.glob("*.pf")):
+            self.parser.error(f"No Prefetch files found: {source}")
         view.log(f"Converting {self.args.prefetch_file}.", self.args.quiet)
 
         if self.args.multiprocess:
-            view.log(f"Multi-Process: {cpu_count()}", self.args.quiet)
+            view.log(f"Multiprocessing enabled ({cpu_count()} workers).", self.args.quiet)
 
         if self.args.timeline:
             view.log("Timeline analysis mode enabled", self.args.quiet)
@@ -52,13 +72,18 @@ class Prefetch2jsonView(BaseView):
             chunk_size=self.args.size,
             timeline_mode=self.args.timeline,
             tags=self.args.tags,
+            output_format=self.args.format,
         ).export_json()
 
-        view.log("Converted.", self.args.quiet)
+        view.log("Conversion completed successfully.", self.args.quiet)
 
 
 def entry_point():
-    Prefetch2jsonView().run()
+    try:
+        Prefetch2jsonView().run()
+    except Exception as error:
+        print(f"Error: {error}", file=sys.stderr)
+        raise SystemExit(1) from error
 
 
 if __name__ == "__main__":

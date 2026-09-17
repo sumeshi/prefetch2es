@@ -2,9 +2,8 @@
 import sys
 import os
 from datetime import datetime
-from itertools import chain
 from pathlib import Path
-from typing import List, Generator, Iterable, Dict, Union
+from typing import List, Generator, Iterable, Union
 from itertools import islice
 import multiprocessing as mp
 from functools import partial
@@ -52,6 +51,8 @@ def generate_chunks(chunk_size: int, iterable: Iterable) -> Generator:
     Yields:
         Generator: List
     """
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be a positive integer")
     i = iter(iterable)
     piece = list(islice(i, chunk_size))
     while piece:
@@ -270,7 +271,7 @@ class Prefetch2es(SafeMultiprocessingMixin):
             return [self.path]
         elif self.path.is_dir():
             # Find all .pf files in directory
-            return list(self.path.glob("*.pf"))
+            return list(self.path.rglob("*.pf"))
         else:
             raise ValueError(f"Invalid path: {self.path}")
 
@@ -286,6 +287,8 @@ class Prefetch2es(SafeMultiprocessingMixin):
         Yields:
             Generator[List[dict], None, None]: Yields List[dict] of prefetch records.
         """
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be a positive integer")
         prefetch_files = self._get_prefetch_files()
 
         if not prefetch_files:
@@ -295,11 +298,11 @@ class Prefetch2es(SafeMultiprocessingMixin):
             # Use safe context for Python 3.13 compatibility
             ctx = self.get_multiprocessing_context()
             with ctx.Pool(self.get_cpu_count()) as pool:
-                results = pool.map_async(
+                results = pool.imap(
                     process_prefetch_chunk,
                     generate_chunks(chunk_size, prefetch_files),
                 )
-                yield list(chain.from_iterable(results.get(timeout=None)))
+                yield from results
         else:
             # Single process mode
             buffer: List[dict] = []
@@ -328,6 +331,8 @@ class Prefetch2es(SafeMultiprocessingMixin):
         Yields:
             Generator[List[dict], None, None]: Yields List[dict] of timeline-formatted prefetch records.
         """
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be a positive integer")
         prefetch_files = self._get_prefetch_files()
 
         if not prefetch_files:
@@ -341,11 +346,11 @@ class Prefetch2es(SafeMultiprocessingMixin):
                 process_func = partial(
                     process_timeline_prefetch_chunk_with_tags, tags=tags
                 )
-                results = pool.map_async(
+                results = pool.imap(
                     process_func,
                     generate_chunks(chunk_size, prefetch_files),
                 )
-                yield list(chain.from_iterable(results.get(timeout=None)))
+                yield from results
         else:
             # Single process mode
             buffer: List[dict] = []

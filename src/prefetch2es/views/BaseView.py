@@ -5,10 +5,17 @@ from abc import ABCMeta, abstractmethod
 from prefetch2es.models.MetaData import get_version
 
 
+def positive_int(value):
+    number = int(value)
+    if number <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return number
+
+
 class BaseView(metaclass=ABCMeta):
 
     def __init__(self):
-        self.parser = argparse.ArgumentParser()
+        self.parser = argparse.ArgumentParser(allow_abbrev=False)
         self.__define_common_options()
 
     def __define_common_options(self):
@@ -19,20 +26,20 @@ class BaseView(metaclass=ABCMeta):
             "--quiet",
             "-q",
             action="store_true",
-            help="flag to suppress standard output.",
+            help="Suppress standard output.",
         )
         self.parser.add_argument(
             "--multiprocess",
             "-m",
             action="store_true",
-            help="flag to run multiprocessing.",
+            help="Enable multiprocessing.",
         )
         self.parser.add_argument(
             "--size",
             "-s",
-            type=int,
+            type=positive_int,
             default=500,
-            help="size of the chunk to be processed for each process.",
+            help="Number of files to process in each chunk.",
         )
 
     @abstractmethod
