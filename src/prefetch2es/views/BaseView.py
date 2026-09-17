@@ -2,7 +2,7 @@
 import argparse
 from abc import ABCMeta, abstractmethod
 
-from prefetch2es.models.MetaData import get_version
+from prefetch2es.__about__ import __version__
 
 
 def positive_int(value):
@@ -20,7 +20,7 @@ class BaseView(metaclass=ABCMeta):
 
     def __define_common_options(self):
         self.parser.add_argument(
-            "--version", "-v", action="version", version=get_version("prefetch2es")
+            "--version", "-v", action="version", version=__version__
         )
         self.parser.add_argument(
             "--quiet",

@@ -2,8 +2,11 @@
 from typing import List
 from pathlib import Path
 
+from prefetch2es.__about__ import __version__
 from prefetch2es.models.Prefetch2es import Prefetch2es
 from prefetch2es.presenters.Prefetch2esPresenter import Prefetch2esPresenter
+
+__all__ = ["__version__", "prefetch2es", "prefetch2json"]
 
 
 # Public Python API.

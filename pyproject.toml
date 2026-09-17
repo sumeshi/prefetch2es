@@ -1,6 +1,6 @@
 [project]
 name = "prefetch2es"
-version = "2.4.1"
+dynamic = ["version"]
 description = "A library for fast parse & import of Windows Prefetch into Elasticsearch."
 readme = "README.md"
 license = "MIT"
@@ -20,6 +20,9 @@ dependencies = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/prefetch2es/__about__.py"
 
 [dependency-groups]
 dev = [

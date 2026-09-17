@@ -67,6 +67,14 @@ def test_prefetch2json_version(monkeypatch):
             p2j()
     assert exited.value.code == 0
 
+
+def test_version_is_defined_in_about_module():
+    from prefetch2es import __version__
+    from prefetch2es.__about__ import __version__ as about_version
+
+    assert __version__ == about_version == "2.4.1"
+
+
 # behavior test cases 
 @pytest.mark.usefixtures("prepare_prefetch")
 def test__prefetch2json_convert(monkeypatch):
