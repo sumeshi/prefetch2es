@@ -40,17 +40,23 @@ jobs:
           uv run prefetch2json -h
           uv run prefetch2json -v
       
+      - name: Prepare corresponding sources and build libscca
+        run: uv run --locked python .github/prepare_release_sources.py dist/sources
+
+      - name: Collect runtime licenses
+        run: uv run --no-sync python .github/collect_runtime_licenses.py dist/LICENSES.txt
+
       - name: build
         run: |
-          uv run python -m nuitka --standalone --onefile --follow-imports -o prefetch2es-windows-x64-v$env:version.exe --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2esView.py
-          uv run python -m nuitka --standalone --onefile --follow-imports -o prefetch2json-windows-x64-v$env:version.exe --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2jsonView.py
+          uv run --no-sync python -m nuitka --standalone --onefile --follow-imports -o prefetch2es --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2esView.py
+          uv run --no-sync python -m nuitka --standalone --onefile --follow-imports -o prefetch2json --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2jsonView.py
       
       - name: verify
         run: |
-          dist/prefetch2es-windows-x64-v$version.exe -h
-          dist/prefetch2es-windows-x64-v$version.exe -v
-          dist/prefetch2json-windows-x64-v$version.exe -h
-          dist/prefetch2json-windows-x64-v$version.exe -v
+          dist/prefetch2es.exe -h
+          dist/prefetch2es.exe -v
+          dist/prefetch2json.exe -h
+          dist/prefetch2json.exe -v
         shell: bash
       
       - name: Create tag
@@ -64,13 +70,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
 
+      - name: Bundle release assets
+        run: |
+          bundle="dist/prefetch2es-windows-x64-v${{ steps.create_tag.outputs.version }}"
+          mkdir -p "$bundle"
+          mv dist/prefetch2es.exe "$bundle/prefetch2es.exe"
+          mv dist/prefetch2json.exe "$bundle/prefetch2json.exe"
+          cp dist/LICENSES.txt "$bundle/LICENSES.txt"
+          cp -R dist/sources "$bundle/sources"
+          python -c "import shutil; shutil.make_archive(r'$bundle', 'zip', root_dir=r'$bundle')"
+        shell: bash
+
       - name: create release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.create_tag.outputs.version }}
           files: |
-            dist/prefetch2es-windows-x64-v${{ env.version }}.exe
-            dist/prefetch2json-windows-x64-v${{ env.version }}.exe
+            dist/prefetch2es-windows-x64-v${{ steps.create_tag.outputs.version }}.zip
           name: Release v${{ steps.create_tag.outputs.version }}
           body: 'This release was automatically created by GitHub Actions.'
         env:
@@ -105,25 +121,41 @@ jobs:
           uv run prefetch2json -h
           uv run prefetch2json -v
 
+      - name: Prepare corresponding sources and build libscca
+        run: uv run --locked python .github/prepare_release_sources.py dist/sources
+
+      - name: Collect runtime licenses
+        run: uv run --no-sync python .github/collect_runtime_licenses.py dist/LICENSES.txt
+
       - name: build
         run: |
           pip install nuitka
-          uv run python -m nuitka --standalone --onefile --follow-imports -o prefetch2es-linux-x64-v$version --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2esView.py
-          uv run python -m nuitka --standalone --onefile --follow-imports -o prefetch2json-linux-x64-v$version --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2jsonView.py
+          uv run --no-sync python -m nuitka --standalone --onefile --follow-imports -o prefetch2es --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2esView.py
+          uv run --no-sync python -m nuitka --standalone --onefile --follow-imports -o prefetch2json --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2jsonView.py
       
       - name: verify
         run: |
-          dist/prefetch2es-linux-x64-v$version -h
-          dist/prefetch2es-linux-x64-v$version -v
-          dist/prefetch2json-linux-x64-v$version -h
-          dist/prefetch2json-linux-x64-v$version -v
+          dist/prefetch2es -h
+          dist/prefetch2es -v
+          dist/prefetch2json -h
+          dist/prefetch2json -v
+
+      - name: Bundle release assets
+        run: |
+          bundle="dist/prefetch2es-linux-x64-v${{ needs.build-windows.outputs.version }}"
+          mkdir -p "$bundle"
+          mv dist/prefetch2es "$bundle/prefetch2es"
+          mv dist/prefetch2json "$bundle/prefetch2json"
+          cp dist/LICENSES.txt "$bundle/LICENSES.txt"
+          cp -R dist/sources "$bundle/sources"
+          python -c "import shutil; shutil.make_archive(r'$bundle', 'zip', root_dir=r'$bundle')"
+        shell: bash
 
       - name: upload asset to release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ needs.build-windows.outputs.version }}
           files: |
-            dist/prefetch2es-linux-x64-v${{ env.version }}
-            dist/prefetch2json-linux-x64-v${{ env.version }}
+            dist/prefetch2es-linux-x64-v${{ needs.build-windows.outputs.version }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

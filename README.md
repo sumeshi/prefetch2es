@@ -405,6 +405,14 @@ prefetch2es is released under the [MIT](https://github.com/sumeshi/prefetch2es/b
 
 ### Third-party licenses
 
+Standalone releases are ZIP archives containing both commands and `LICENSES.txt`
+with project, runtime dependency and Python license notices. Keep the notices
+with the executables when redistributing them.
+
+The ZIP also contains the libscca source used for the build and the application
+release source under `sources/`. See [REBUILD.md](REBUILD.md) to rebuild with a
+modified libscca. Embedded native dependencies still require separate review.
+
 The standalone binaries distributed via GitHub Releases bundle [libscca / pyscca](https://github.com/libyal/libscca),
 which is licensed under the [GNU Lesser General Public License v3.0 or later (LGPL-3.0-or-later)](https://www.gnu.org/licenses/lgpl-3.0.html).
 
