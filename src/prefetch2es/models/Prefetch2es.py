@@ -275,7 +275,7 @@ class Prefetch2es(SafeMultiprocessingMixin):
         Args:
             input_path (Union[str, Path]): Path to prefetch file or directory
         """
-        self.path = Path(input_path)
+        self.path = Path(input_path).resolve()
 
     def _get_prefetch_files(self) -> List[Path]:
         """Get list of prefetch files to process.

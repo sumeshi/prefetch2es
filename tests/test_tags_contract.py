@@ -159,3 +159,36 @@ def fake_prefetch(tmp_path, monkeypatch):
 
     monkeypatch.setattr(module.pyscca, "file", FakePrefetch)
     return source
+
+
+@pytest.mark.parametrize("timeline", [False, True])
+@pytest.mark.parametrize("input_kind", ["file", "directory", "symlink"])
+def test_json_and_es_preserve_the_same_absolute_evidence_path(
+    tmp_path, monkeypatch, fake_prefetch, timeline, input_kind
+):
+    from prefetch2es.presenters.Prefetch2esPresenter import Prefetch2esPresenter
+    from prefetch2es.presenters.Prefetch2jsonPresenter import Prefetch2jsonPresenter
+
+    monkeypatch.chdir(tmp_path)
+    supplied = Path(".") if input_kind == "directory" else Path(fake_prefetch.name)
+    if input_kind == "symlink":
+        supplied = Path("alias.pf")
+        supplied.symlink_to(fake_prefetch)
+    output = tmp_path / "output.json"
+    Prefetch2jsonPresenter(
+        supplied, str(output), is_quiet=True, timeline_mode=timeline
+    ).export_json()
+    exported = json.loads(output.read_text())
+    for path in (supplied, supplied.resolve()):
+        presenter = Prefetch2esPresenter(path, is_quiet=True, timeline_mode=timeline)
+        records = [record for chunk in presenter.prefetch2es() for record in chunk]
+        assert records == exported
+        if timeline:
+            assert all(
+                record["log"]["file"]["path"] == str(fake_prefetch)
+                for record in records
+            )
+        else:
+            assert all(
+                record["source_file"] == str(fake_prefetch) for record in records
+            )
