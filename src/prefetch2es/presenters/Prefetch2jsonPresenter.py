@@ -1,6 +1,7 @@
 # coding: utf-8
 from itertools import chain
 from pathlib import Path
+from typing import Sequence, Union
 
 import orjson
 from tqdm import tqdm
@@ -17,7 +18,7 @@ class Prefetch2jsonPresenter(object):
         multiprocess: bool = False,
         chunk_size: int = 500,
         timeline_mode: bool = False,
-        tags: str = "",
+        tags: Union[str, Sequence[str]] = "",
         output_format: str = "json",
     ):
         if output_format not in ("json", "jsonl", "ndjson"):
@@ -48,8 +49,11 @@ class Prefetch2jsonPresenter(object):
                 raise ValueError("The output path must not be a symbolic link.")
         model = Prefetch2es(self.input_path)
         kwargs = dict(multiprocess=self.multiprocess, chunk_size=self.chunk_size)
-        records = (model.gen_timeline_records(tags=self.tags, **kwargs)
-                   if self.timeline_mode else model.gen_records(**kwargs))
+        records = (
+            model.gen_timeline_records(tags=self.tags, **kwargs)
+            if self.timeline_mode
+            else model.gen_records(tags=self.tags, **kwargs)
+        )
         progress = records if self.is_quiet else tqdm(records)
         try:
             if self.output_format == "json":

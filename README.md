@@ -116,7 +116,7 @@ $ prefetch2es /pffiles/ # The path is recursively expanded to all .pf files.
   (default: False)
 
 --tags:
-  Comma-separated tags to add to each record for identification
+  Comma-separated tags to add to records in Standard and Timeline modes
   (e.g., hostname, domain name) (default: )
 
 --login:

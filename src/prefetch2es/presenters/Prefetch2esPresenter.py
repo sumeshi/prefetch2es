@@ -1,5 +1,6 @@
 # coding: utf-8
 from pathlib import Path
+from typing import Sequence, Union
 
 from prefetch2es.models.Prefetch2es import Prefetch2es
 from prefetch2es.models.ElasticsearchUtils import ElasticsearchUtils
@@ -22,7 +23,7 @@ class Prefetch2esPresenter(object):
         chunk_size: int = 500,
         logger=None,
         timeline_mode: bool = False,
-        tags: str = "",
+        tags: Union[str, Sequence[str]] = "",
         verify_certs: bool = True,
         ca_certs: str | None = None,
     ):
@@ -58,6 +59,7 @@ class Prefetch2esPresenter(object):
             for records in prefetch2es.gen_records(
                 multiprocess=self.multiprocess,
                 chunk_size=self.chunk_size,
+                tags=self.tags,
             ):
                 yield records
 

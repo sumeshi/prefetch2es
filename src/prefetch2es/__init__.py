@@ -1,5 +1,5 @@
 # coding: utf-8
-from typing import List
+from typing import List, Sequence, Union
 from pathlib import Path
 
 from prefetch2es.__about__ import __version__
@@ -24,7 +24,7 @@ def prefetch2es(
     multiprocess: bool = False,
     chunk_size: int = 500,
     timeline_mode: bool = False,
-    tags: str = "",
+    tags: Union[str, Sequence[str]] = "",
 ) -> None:
     """Import Windows Prefetch records into Elasticsearch.
     Args:
@@ -62,8 +62,8 @@ def prefetch2es(
             Enable timeline analysis mode and create specialized timeline
             records for Prefetch execution events.
 
-        tags (str, optional):
-            Additional comma-separated tags for timeline records.
+        tags (str or Sequence[str], optional):
+            Comma-separated string or sequence of tags to add to records.
     """
 
     Prefetch2esPresenter(
@@ -88,7 +88,7 @@ def prefetch2json(
     multiprocess: bool = False,
     chunk_size: int = 500,
     timeline_mode: bool = False,
-    tags: str = "",
+    tags: Union[str, Sequence[str]] = "",
 ) -> List[dict]:
     """Convert Windows Prefetch files to a list of dictionaries.
 
@@ -97,7 +97,7 @@ def prefetch2json(
         multiprocess (bool): Flag to run multiprocessing.
         chunk_size (int): Number of files to process in each chunk.
         timeline_mode (bool): Enable timeline analysis mode.
-        tags (str): Additional comma-separated tags for timeline records.
+        tags (str or Sequence[str]): Comma-separated string or sequence of tags.
 
     Note:
         Since the content of the file is loaded into memory at once,
@@ -117,7 +117,9 @@ def prefetch2json(
     else:
         standard_records: List[dict] = sum(
             list(
-                prefetch.gen_records(multiprocess=multiprocess, chunk_size=chunk_size)
+                prefetch.gen_records(
+                    multiprocess=multiprocess, chunk_size=chunk_size, tags=tags
+                )
             ),
             list(),
         )

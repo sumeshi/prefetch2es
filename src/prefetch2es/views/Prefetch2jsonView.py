@@ -44,7 +44,7 @@ class Prefetch2jsonView(BaseView):
         self.parser.add_argument(
             "--tags",
             default="",
-            help="Additional comma-separated tags for timeline records.",
+            help="Comma-separated tags for Standard and Timeline records.",
         )
 
     def run(self):

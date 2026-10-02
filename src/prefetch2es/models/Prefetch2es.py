@@ -3,7 +3,7 @@ import sys
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import List, Generator, Iterable, Union
+from typing import List, Generator, Iterable, Union, Sequence
 from itertools import islice
 import multiprocessing as mp
 from functools import partial
@@ -13,6 +13,22 @@ import pyscca
 
 
 FILETIME_ZERO = datetime(1601, 1, 1, 0, 0, 0)
+
+
+def normalize_tags(tags: Union[str, Sequence[str], None]) -> List[str]:
+    """Normalize comma-separated strings or tag sequences, preserving order."""
+    if tags is None:
+        user_tags = []
+    elif isinstance(tags, str):
+        user_tags = [tag.strip() for tag in tags.split(",") if tag.strip()]
+    else:
+        user_tags = [tag.strip() for tag in tags if tag.strip()]
+
+    result = []
+    for tag in ["prefetch", *user_tags]:
+        if tag not in result:
+            result.append(tag)
+    return result
 
 
 class SafeMultiprocessingMixin:
@@ -74,7 +90,7 @@ def safe_last_run_times(p: pyscca.file) -> List[str]:
     return times
 
 
-def process_prefetch_file(filepath: Path, tags: str = "") -> dict:
+def process_prefetch_file(filepath: Path, tags: Union[str, Sequence[str]] = "") -> dict:
     """Process a single prefetch file and return its data.
 
     Args:
@@ -88,10 +104,7 @@ def process_prefetch_file(filepath: Path, tags: str = "") -> dict:
         p.open_file_object(file_object)
         try:
             # Parse tags from comma-separated string
-            additional_tags = (
-                [tag.strip() for tag in tags.split(",") if tag.strip()] if tags else []
-            )
-            base_tags = ["prefetch"] + additional_tags
+            base_tags = normalize_tags(tags)
             last_exec_times = safe_last_run_times(p)
 
             return {
@@ -126,7 +139,9 @@ def process_prefetch_file(filepath: Path, tags: str = "") -> dict:
             p.close()
 
 
-def process_prefetch_file_timeline(filepath: Path, tags: str) -> List[dict]:
+def process_prefetch_file_timeline(
+    filepath: Path, tags: Union[str, Sequence[str]]
+) -> List[dict]:
     """Process a single prefetch file and return its timeline data.
 
     Args:
@@ -141,10 +156,7 @@ def process_prefetch_file_timeline(filepath: Path, tags: str) -> List[dict]:
         p.open_file_object(file_object)
         try:
             # Parse tags from comma-separated string
-            additional_tags = (
-                [tag.strip() for tag in tags.split(",") if tag.strip()] if tags else []
-            )
-            base_tags = ["prefetch"] + additional_tags
+            base_tags = normalize_tags(tags)
             last_exec_times = safe_last_run_times(p)
 
             timeline_records = []
@@ -203,7 +215,9 @@ def process_prefetch_file_timeline(filepath: Path, tags: str) -> List[dict]:
             p.close()
 
 
-def process_prefetch_chunk(filepaths: List[Path]) -> List[dict]:
+def process_prefetch_chunk(
+    filepaths: List[Path], tags: Union[str, Sequence[str]] = ""
+) -> List[dict]:
     """Process a chunk of prefetch files.
 
     Args:
@@ -212,10 +226,12 @@ def process_prefetch_chunk(filepaths: List[Path]) -> List[dict]:
     Returns:
         List[dict]: List of processed prefetch data
     """
-    return [process_prefetch_file(filepath) for filepath in filepaths]
+    return [process_prefetch_file(filepath, tags) for filepath in filepaths]
 
 
-def process_timeline_prefetch_chunk(filepaths: List[Path], tags: str = "") -> List[dict]:
+def process_timeline_prefetch_chunk(
+    filepaths: List[Path], tags: Union[str, Sequence[str]] = ""
+) -> List[dict]:
     """Process a chunk of prefetch files for timeline analysis.
 
     Args:
@@ -232,7 +248,7 @@ def process_timeline_prefetch_chunk(filepaths: List[Path], tags: str = "") -> Li
 
 
 def process_timeline_prefetch_chunk_with_tags(
-    filepaths: List[Path], tags: str
+    filepaths: List[Path], tags: Union[str, Sequence[str]]
 ) -> List[dict]:
     """Process a chunk of prefetch files for timeline analysis with tags.
 
@@ -276,7 +292,10 @@ class Prefetch2es(SafeMultiprocessingMixin):
             raise ValueError(f"Invalid path: {self.path}")
 
     def gen_records(
-        self, multiprocess: bool = False, chunk_size: int = 1000
+        self,
+        multiprocess: bool = False,
+        chunk_size: int = 1000,
+        tags: Union[str, Sequence[str]] = "",
     ) -> Generator[List[dict], None, None]:
         """Generate prefetch records.
 
@@ -299,7 +318,7 @@ class Prefetch2es(SafeMultiprocessingMixin):
             ctx = self.get_multiprocessing_context()
             with ctx.Pool(self.get_cpu_count()) as pool:
                 results = pool.imap(
-                    process_prefetch_chunk,
+                    partial(process_prefetch_chunk, tags=tags),
                     generate_chunks(chunk_size, prefetch_files),
                 )
                 yield from results
@@ -307,7 +326,7 @@ class Prefetch2es(SafeMultiprocessingMixin):
             # Single process mode
             buffer: List[dict] = []
             for chunk in generate_chunks(chunk_size, prefetch_files):
-                processed_chunk = process_prefetch_chunk(chunk)
+                processed_chunk = process_prefetch_chunk(chunk, tags)
                 buffer.extend(processed_chunk)
 
                 if len(buffer) >= chunk_size:
@@ -319,7 +338,10 @@ class Prefetch2es(SafeMultiprocessingMixin):
                 yield buffer
 
     def gen_timeline_records(
-        self, multiprocess: bool = False, chunk_size: int = 1000, tags: str = ""
+        self,
+        multiprocess: bool = False,
+        chunk_size: int = 1000,
+        tags: Union[str, Sequence[str]] = "",
     ) -> Generator[List[dict], None, None]:
         """Generate timeline-formatted prefetch records.
 
