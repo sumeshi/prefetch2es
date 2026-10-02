@@ -28,7 +28,7 @@ $ pip install prefetch2es
 
 ### From GitHub Releases
 
-Standalone binaries built with Nuitka are available from GitHub Releases.
+Standalone binaries are available from GitHub Releases.
 
 ```bash
 $ chmod +x ./prefetch2es
@@ -169,11 +169,8 @@ $ prefetch2es /path/to/your/file.pf --timeline --tags="WORKSTATION-01" --index=p
 $ prefetch2es /path/to/your/file.pf --timeline --tags="WORKSTATION-01,FOO,BAR" --index=prefetch-timeline
 ```
 
-> [!WARNING]
-> TLS certificate verification is enabled by default. Use `--no-verify-certs` only
-> when connecting to a trusted cluster with a self-signed or otherwise
-> unverifiable certificate. Use `--ca-certs /path/to/ca.pem` to provide a
-> private CA bundle while keeping verification enabled.
+TLS verification is enabled by default. For a private CA, use
+`--ca-certs /path/to/ca.pem`.
 
 ## Appendix
 
@@ -185,9 +182,8 @@ $ prefetch2es /path/to/your/file.pf --timeline --tags="WORKSTATION-01,FOO,BAR" -
 $ prefetch2json /path/to/your/file.pf -o /path/to/output/target.json
 ```
 
-`prefetch2json` also supports line-delimited output. `--format jsonl` (or
-`ndjson`) writes one record per line without holding the entire dataset in
-memory. When no output path is specified, the default extension is `.jsonl`:
+Use `--format jsonl` (or `ndjson`) to write one record per line.
+The default output extension is `.jsonl`:
 
 ```bash
 $ prefetch2json /path/to/your/file.pf --format jsonl
@@ -211,27 +207,11 @@ $ prefetch2json /path/to/your/file.pf --timeline --tags="WORKSTATION-01,FINANCE"
 
 ### Timeline Analysis
 
-prefetch2es supports timeline analysis mode that creates specialized timeline records for forensic investigation.
-
 Standard mode creates one record per Prefetch file.
 Timeline mode creates one record per recorded execution timestamp.
 
 ```bash
 $ prefetch2es /path/to/your/file.pf --timeline --index=prefetch-timeline
-```
-
-This mode creates records optimized for temporal analysis of application execution patterns, making it easier to investigate system activity over time.
-
-#### Tags for System Identification
-
-Use the `--tags` option to add custom tags for better organization and filtering:
-
-```bash
-# Identify source system and department
-$ prefetch2es /path/to/prefetch/ --timeline --tags="WORKSTATION-01" --index=prefetch-timeline
-
-# Add criticality level
-$ prefetch2es /path/to/prefetch/ --timeline --tags="SERVER-02,FOO,BAR" --index=prefetch-timeline
 ```
 
 ## Output Format Examples
@@ -411,7 +391,7 @@ with the executables when redistributing them.
 
 The ZIP also contains the libscca source used for the build and the application
 release source under `sources/`. See [REBUILD.md](REBUILD.md) to rebuild with a
-modified libscca. Embedded native dependencies still require separate review.
+modified libscca.
 
 The standalone binaries distributed via GitHub Releases bundle [libscca / pyscca](https://github.com/libyal/libscca),
 which is licensed under the [GNU Lesser General Public License v3.0 or later (LGPL-3.0-or-later)](https://www.gnu.org/licenses/lgpl-3.0.html).
