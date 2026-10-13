@@ -1,18 +1,22 @@
 # coding: utf-8
 import sys
 import os
+import stat
 from datetime import datetime
 from pathlib import Path
 from typing import List, Generator, Iterable, Union, Sequence
-from itertools import islice
 import multiprocessing as mp
 from functools import partial
 
 
 import pyscca
 
-
 FILETIME_ZERO = datetime(1601, 1, 1, 0, 0, 0)
+
+
+def validate_chunk_size(chunk_size: int) -> None:
+    if type(chunk_size) is not int or chunk_size <= 0:
+        raise ValueError("chunk_size must be greater than zero")
 
 
 def normalize_tags(tags: Union[str, Sequence[str], None]) -> List[str]:
@@ -57,25 +61,6 @@ class SafeMultiprocessingMixin:
             return os.cpu_count() or 1
 
 
-def generate_chunks(chunk_size: int, iterable: Iterable) -> Generator:
-    """Generate arbitrarily sized chunks from iterable objects.
-
-    Args:
-        chunk_size (int): Chunk sizes.
-        iterable (Iterable): Original Iterable object.
-
-    Yields:
-        Generator: List
-    """
-    if chunk_size <= 0:
-        raise ValueError("chunk_size must be a positive integer")
-    i = iter(iterable)
-    piece = list(islice(i, chunk_size))
-    while piece:
-        yield piece
-        piece = list(islice(i, chunk_size))
-
-
 def safe_last_run_times(p: pyscca.file) -> List[str]:
     """Read available last-run timestamps without trusting run_count."""
     times = []
@@ -101,8 +86,8 @@ def process_prefetch_file(filepath: Path, tags: Union[str, Sequence[str]] = "") 
     """
     p = pyscca.file()
     with filepath.open(mode="rb") as file_object:
-        p.open_file_object(file_object)
         try:
+            p.open_file_object(file_object)
             # Parse tags from comma-separated string
             base_tags = normalize_tags(tags)
             last_exec_times = safe_last_run_times(p)
@@ -127,7 +112,9 @@ def process_prefetch_file(filepath: Path, tags: Union[str, Sequence[str]] = "") 
                 "volumes": [
                     {
                         "path": volume.device_path,
-                        "creation_time": f"{volume.get_creation_time()}Z".replace(' ', 'T'),
+                        "creation_time": f"{volume.get_creation_time()}Z".replace(
+                            " ", "T"
+                        ),
                         "serial_number": format(volume.serial_number, "x").upper(),
                     }
                     for volume in p.volumes
@@ -153,8 +140,8 @@ def process_prefetch_file_timeline(
     """
     p = pyscca.file()
     with filepath.open(mode="rb") as file_object:
-        p.open_file_object(file_object)
         try:
+            p.open_file_object(file_object)
             # Parse tags from comma-separated string
             base_tags = normalize_tags(tags)
             last_exec_times = safe_last_run_times(p)
@@ -187,7 +174,9 @@ def process_prefetch_file_timeline(
                                 "volumes": [
                                     {
                                         "path": volume.device_path,
-                                        "creation_time": f"{volume.get_creation_time()}Z".replace(' ', 'T'),
+                                        "creation_time": f"{volume.get_creation_time()}Z".replace(
+                                            " ", "T"
+                                        ),
                                         "serial_number": format(
                                             volume.serial_number, "x"
                                         ).upper(),
@@ -215,67 +204,123 @@ def process_prefetch_file_timeline(
             p.close()
 
 
-def process_prefetch_chunk(
-    filepaths: List[Path], tags: Union[str, Sequence[str]] = ""
-) -> List[dict]:
-    """Process a chunk of prefetch files.
+def get_prefetch_files(
+    input_paths: Sequence[Union[str, Path]], diagnostics: List[dict] | None = None
+) -> List[Path]:
+    """Expand usable Prefetch inputs and record paths that cannot be processed."""
+    files = []
+    seen = set()
 
-    Args:
-        filepaths (List[Path]): List of prefetch file paths
+    def record_scan_error(error, directory=None):
+        if diagnostics is not None:
+            diagnostics.append(
+                {
+                    "source_file": str(directory or error.filename),
+                    "error": f"Cannot enumerate input: {error}",
+                }
+            )
 
-    Returns:
-        List[dict]: List of processed prefetch data
-    """
-    return [process_prefetch_file(filepath, tags) for filepath in filepaths]
+    for input_path in input_paths:
+        path = Path(input_path)
+        try:
+            path = path.resolve()
+            mode = path.stat().st_mode
+            is_file = stat.S_ISREG(mode)
+            is_directory = stat.S_ISDIR(mode)
+        except OSError as error:
+            record_scan_error(error, path)
+            continue
+        error_count = len(diagnostics) if diagnostics is not None else 0
+        candidates: Iterable[Path]
+        if is_file:
+            candidates = [path]
+        elif is_directory:
+            candidates = (
+                Path(directory) / name
+                for directory, _, names in os.walk(path, onerror=record_scan_error)
+                for name in names
+                if Path(name).suffix.lower() == ".pf"
+            )
+        else:
+            if diagnostics is not None:
+                diagnostics.append(
+                    {
+                        "source_file": str(path),
+                        "error": "Input path does not exist or is not a file/directory.",
+                    }
+                )
+            continue
+        found = False
+        for candidate in candidates:
+            try:
+                if not stat.S_ISREG(candidate.stat().st_mode):
+                    continue
+            except OSError as error:
+                record_scan_error(error, candidate.parent)
+                continue
+            found = True
+            resolved = candidate.resolve()
+            if resolved not in seen:
+                files.append(resolved)
+                seen.add(resolved)
+        if (
+            not found
+            and is_directory
+            and diagnostics is not None
+            and len(diagnostics) == error_count
+        ):
+            diagnostics.append(
+                {"source_file": str(path), "error": "No Prefetch files found."}
+            )
+    return files
 
 
-def process_timeline_prefetch_chunk(
-    filepaths: List[Path], tags: Union[str, Sequence[str]] = ""
-) -> List[dict]:
-    """Process a chunk of prefetch files for timeline analysis.
+class PartialExtractionError(RuntimeError):
+    """Completed processing with failed files; successful output is partial."""
 
-    Args:
-        filepaths (List[Path]): List of prefetch file paths
-
-    Returns:
-        List[dict]: List of timeline-formatted prefetch data
-    """
-    result = []
-    for filepath in filepaths:
-        timeline_records = process_prefetch_file_timeline(filepath, tags)
-        result.extend(timeline_records)
-    return result
+    def __init__(self, diagnostics, records=None):
+        self.diagnostics = diagnostics
+        self.records = records
+        super().__init__(
+            f"Partial extraction: {len(diagnostics)} failure(s); output is incomplete."
+        )
 
 
-def process_timeline_prefetch_chunk_with_tags(
-    filepaths: List[Path], tags: Union[str, Sequence[str]]
-) -> List[dict]:
-    """Process a chunk of prefetch files for timeline analysis with tags.
-
-    Args:
-        filepaths (List[Path]): List of prefetch file paths
-        tags (str): Additional tags for timeline records (comma-separated)
-
-    Returns:
-        List[dict]: List of timeline-formatted prefetch data
-    """
-    result = []
-    for filepath in filepaths:
-        timeline_records = process_prefetch_file_timeline(filepath, tags)
-        result.extend(timeline_records)
-    return result
+def process_prefetch_task(filepath: Path, tags="", timeline_mode=False):
+    """Return one file's records or its serializable processing exception."""
+    try:
+        records = (
+            process_prefetch_file_timeline(filepath, tags)
+            if timeline_mode
+            else [process_prefetch_file(filepath, tags)]
+        )
+        return filepath, records, None
+    except Exception as error:
+        return filepath, [], error
 
 
 class Prefetch2es(SafeMultiprocessingMixin):
     """Prefetch file processor with multiprocessing support"""
 
-    def __init__(self, input_path: Union[str, Path]) -> None:
+    def __init__(
+        self,
+        input_path: Union[str, Path, Sequence[Path]],
+        input_diagnostics: Sequence[dict] = (),
+    ) -> None:
         """Initialize Prefetch2es.
 
         Args:
-            input_path (Union[str, Path]): Path to prefetch file or directory
+            input_path: Prefetch file, directory, or already enumerated files.
         """
-        self.path = Path(input_path).resolve()
+        self.path = (
+            Path(input_path).resolve()
+            if isinstance(input_path, (str, Path))
+            else list(dict.fromkeys(Path(path).resolve() for path in input_path))
+        )
+        self.input_diagnostics = list(input_diagnostics)
+        self.diagnostics: List[dict] = []
+        self.successful_files = 0
+        self.generated_records = 0
 
     def _get_prefetch_files(self) -> List[Path]:
         """Get list of prefetch files to process.
@@ -283,13 +328,10 @@ class Prefetch2es(SafeMultiprocessingMixin):
         Returns:
             List[Path]: List of prefetch file paths
         """
-        if self.path.is_file():
-            return [self.path]
-        elif self.path.is_dir():
-            # Find all .pf files in directory
-            return list(self.path.rglob("*.pf"))
-        else:
-            raise ValueError(f"Invalid path: {self.path}")
+        if isinstance(self.path, Path):
+            return get_prefetch_files([self.path], self.diagnostics)
+        # Keep the discovery snapshot so vanished files fail inside their task.
+        return list(self.path)
 
     def gen_records(
         self,
@@ -301,41 +343,14 @@ class Prefetch2es(SafeMultiprocessingMixin):
 
         Args:
             multiprocess (bool): Flag to run multiprocessing.
-            chunk_size (int): Size of the chunk to be processed for each process.
+            chunk_size (int): Maximum documents per output chunk.
 
         Yields:
             Generator[List[dict], None, None]: Yields List[dict] of prefetch records.
         """
-        if chunk_size <= 0:
-            raise ValueError("chunk_size must be a positive integer")
-        prefetch_files = self._get_prefetch_files()
-
-        if not prefetch_files:
-            return
-
-        if multiprocess and len(prefetch_files) > 1:
-            # Use safe context for Python 3.13 compatibility
-            ctx = self.get_multiprocessing_context()
-            with ctx.Pool(self.get_cpu_count()) as pool:
-                results = pool.imap(
-                    partial(process_prefetch_chunk, tags=tags),
-                    generate_chunks(chunk_size, prefetch_files),
-                )
-                yield from results
-        else:
-            # Single process mode
-            buffer: List[dict] = []
-            for chunk in generate_chunks(chunk_size, prefetch_files):
-                processed_chunk = process_prefetch_chunk(chunk, tags)
-                buffer.extend(processed_chunk)
-
-                if len(buffer) >= chunk_size:
-                    yield buffer
-                    buffer = []
-
-            # Yield remaining records
-            if buffer:
-                yield buffer
+        yield from self._gen_records(
+            multiprocess, chunk_size, tags, False
+        )
 
     def gen_timeline_records(
         self,
@@ -347,43 +362,64 @@ class Prefetch2es(SafeMultiprocessingMixin):
 
         Args:
             multiprocess (bool): Flag to run multiprocessing.
-            chunk_size (int): Size of the chunk to be processed for each process.
+            chunk_size (int): Maximum documents per output chunk.
             tags (str): Additional tags for timeline records (comma-separated).
 
         Yields:
             Generator[List[dict], None, None]: Yields List[dict] of timeline-formatted prefetch records.
         """
-        if chunk_size <= 0:
-            raise ValueError("chunk_size must be a positive integer")
-        prefetch_files = self._get_prefetch_files()
+        yield from self._gen_records(
+            multiprocess, chunk_size, tags, True
+        )
 
-        if not prefetch_files:
-            return
+    def _gen_records(self, multiprocess, chunk_size, tags, timeline):
+        validate_chunk_size(chunk_size)
+        self.diagnostics = list(self.input_diagnostics)
+        files = self._get_prefetch_files()
+        self.successful_files = 0
+        self.generated_records = 0
+        process = partial(process_prefetch_task, tags=tags, timeline_mode=timeline)
 
-        if multiprocess and len(prefetch_files) > 1:
-            # Use safe context for Python 3.13 compatibility
+        if multiprocess and len(files) > 1:
             ctx = self.get_multiprocessing_context()
-            with ctx.Pool(self.get_cpu_count()) as pool:
-                # Create partial function with tags
-                process_func = partial(
-                    process_timeline_prefetch_chunk_with_tags, tags=tags
+            with ctx.Pool(min(self.get_cpu_count(), len(files))) as pool:
+                yield from self._batch_records(
+                    pool.imap(process, files, chunksize=1),
+                    chunk_size,
                 )
-                results = pool.imap(
-                    process_func,
-                    generate_chunks(chunk_size, prefetch_files),
-                )
-                yield from results
         else:
-            # Single process mode
-            buffer: List[dict] = []
-            for chunk in generate_chunks(chunk_size, prefetch_files):
-                processed_chunk = process_timeline_prefetch_chunk_with_tags(chunk, tags)
-                buffer.extend(processed_chunk)
+            yield from self._batch_records(
+                map(process, files), chunk_size
+            )
 
-                if len(buffer) >= chunk_size:
+    def _batch_records(self, results, chunk_size):
+        buffer = []
+        for diagnostic in self.diagnostics:
+            print(
+                f"Skipping input {diagnostic['source_file']}: {diagnostic['error']}",
+                file=sys.stderr,
+            )
+        for filepath, records, error in results:
+            if error is not None:
+                error_text = f"{type(error).__name__}: {error}"
+                self.diagnostics.append(
+                    {"source_file": str(filepath), "error": error_text}
+                )
+                message = (
+                    f"Error parsing {filepath}: {error_text} "
+                    f"({self.successful_files} file(s) parsed successfully, "
+                    f"{self.generated_records} record(s) generated)."
+                )
+                print(message, file=sys.stderr)
+                continue
+            self.successful_files += 1
+            self.generated_records += len(records)
+            for record in records:
+                buffer.append(record)
+                if len(buffer) == chunk_size:
                     yield buffer
                     buffer = []
-
-            # Yield remaining records
-            if buffer:
-                yield buffer
+        if buffer:
+            yield buffer
+        if self.diagnostics:
+            raise PartialExtractionError(self.diagnostics)

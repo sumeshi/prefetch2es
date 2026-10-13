@@ -3,10 +3,14 @@ from typing import List, Sequence, Union
 from pathlib import Path
 
 from prefetch2es.__about__ import __version__
-from prefetch2es.models.Prefetch2es import Prefetch2es
+from prefetch2es.models.Prefetch2es import (
+    PartialExtractionError,
+    Prefetch2es,
+    validate_chunk_size,
+)
 from prefetch2es.presenters.Prefetch2esPresenter import Prefetch2esPresenter
 
-__all__ = ["__version__", "prefetch2es", "prefetch2json"]
+__all__ = ["__version__", "prefetch2es", "prefetch2json", "PartialExtractionError"]
 
 
 # Public Python API.
@@ -56,7 +60,7 @@ def prefetch2es(
             Enable multiprocessing.
 
         chunk_size (int, optional):
-            Number of files to process in each chunk.
+            Maximum documents per output chunk.
 
         timeline_mode (bool, optional):
             Enable timeline analysis mode and create specialized timeline
@@ -64,8 +68,10 @@ def prefetch2es(
 
         tags (str or Sequence[str], optional):
             Comma-separated string or sequence of tags to add to records.
+
     """
 
+    validate_chunk_size(chunk_size)
     Prefetch2esPresenter(
         input_path=Path(input_path),
         host=host,
@@ -77,7 +83,7 @@ def prefetch2es(
         pwd=pwd,
         is_quiet=True,
         multiprocess=multiprocess,
-        chunk_size=int(chunk_size),
+        chunk_size=chunk_size,
         timeline_mode=timeline_mode,
         tags=tags,
     ).bulk_import()
@@ -95,7 +101,7 @@ def prefetch2json(
     Args:
         filepath (str): Input Prefetch file or directory.
         multiprocess (bool): Flag to run multiprocessing.
-        chunk_size (int): Number of files to process in each chunk.
+        chunk_size (int): Maximum documents per output chunk.
         timeline_mode (bool): Enable timeline analysis mode.
         tags (str or Sequence[str]): Comma-separated string or sequence of tags.
 
@@ -103,24 +109,18 @@ def prefetch2json(
         Since the content of the file is loaded into memory at once,
         it requires the same amount of memory as the file to be loaded.
     """
+    validate_chunk_size(chunk_size)
     prefetch = Prefetch2es(Path(filepath).resolve())
-    if timeline_mode:
-        timeline_records: List[dict] = sum(
-            list(
-                prefetch.gen_timeline_records(
-                    multiprocess=multiprocess, chunk_size=chunk_size, tags=tags
-                )
-            ),
-            list(),
-        )
-        return timeline_records
-    else:
-        standard_records: List[dict] = sum(
-            list(
-                prefetch.gen_records(
-                    multiprocess=multiprocess, chunk_size=chunk_size, tags=tags
-                )
-            ),
-            list(),
-        )
-        return standard_records
+    generate = prefetch.gen_timeline_records if timeline_mode else prefetch.gen_records
+    records: List[dict] = []
+    try:
+        for chunk in generate(
+            multiprocess=multiprocess,
+            chunk_size=chunk_size,
+            tags=tags,
+        ):
+            records.extend(chunk)
+    except PartialExtractionError as error:
+        error.records = records
+        raise
+    return records

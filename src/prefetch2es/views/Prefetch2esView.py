@@ -5,6 +5,7 @@ from pathlib import Path
 from multiprocessing import cpu_count
 
 from prefetch2es.views.BaseView import BaseView
+from prefetch2es.models.Prefetch2es import get_prefetch_files
 from prefetch2es.presenters.Prefetch2esPresenter import Prefetch2esPresenter
 
 
@@ -72,29 +73,20 @@ class Prefetch2esView(BaseView):
         )
 
     def __list_prefetch_files(self, prefetch_files: List[str]) -> List[Path]:
-        prefetch_path_list = list()
-        for prefetch_file in prefetch_files:
-            if Path(prefetch_file).is_dir():
-                prefetch_path_list.extend(Path(prefetch_file).glob("**/*.pf"))
-            elif Path(prefetch_file).is_file():
-                prefetch_path_list.append(Path(prefetch_file))
-            else:
-                self.parser.error(
-                    f"Input path does not exist or is not a file/directory: "
-                    f"{prefetch_file}"
-                )
-
-        prefetch_path_list = [p for p in prefetch_path_list if p.is_file()]
-        if not prefetch_path_list:
-            self.parser.error("No Prefetch files found.")
-        return prefetch_path_list
+        self.input_diagnostics = []
+        return get_prefetch_files(prefetch_files, self.input_diagnostics)
 
     def run(self):
         view = self
         prefetch_files = self.__list_prefetch_files(self.args.prefetch_files)
 
         if self.args.multiprocess:
-            view.log(f"Multiprocessing enabled ({cpu_count()} workers).", self.args.quiet)
+            message = (
+                f"Multiprocessing enabled (up to {min(cpu_count(), len(prefetch_files))} workers)."
+                if len(prefetch_files) > 1
+                else "One input file; processing serially."
+            )
+            view.log(message, self.args.quiet)
 
         if self.args.timeline:
             view.log("Timeline analysis mode enabled", self.args.quiet)
@@ -102,24 +94,25 @@ class Prefetch2esView(BaseView):
         for prefetch_file in prefetch_files:
             view.log(f"Importing {prefetch_file}...", self.args.quiet)
 
-            Prefetch2esPresenter(
-                input_path=prefetch_file,
-                host=self.args.host,
-                ca_certs=self.args.ca_certs,
-                port=self.args.port,
-                index=self.args.index,
-                scheme=self.args.scheme,
-                pipeline=self.args.pipeline,
-                login=self.args.login,
-                pwd=self.args.pwd,
-                is_quiet=self.args.quiet,
-                multiprocess=self.args.multiprocess,
-                chunk_size=int(self.args.size),
-                logger=self.log,
-                timeline_mode=self.args.timeline,
-                tags=self.args.tags,
-                verify_certs=not self.args.no_verify_certs,
-            ).bulk_import()
+        Prefetch2esPresenter(
+            input_path=prefetch_files,
+            host=self.args.host,
+            ca_certs=self.args.ca_certs,
+            port=self.args.port,
+            index=self.args.index,
+            scheme=self.args.scheme,
+            pipeline=self.args.pipeline,
+            login=self.args.login,
+            pwd=self.args.pwd,
+            is_quiet=self.args.quiet,
+            multiprocess=self.args.multiprocess,
+            chunk_size=int(self.args.size),
+            logger=self.log,
+            timeline_mode=self.args.timeline,
+            tags=self.args.tags,
+            verify_certs=not self.args.no_verify_certs,
+            input_diagnostics=self.input_diagnostics,
+        ).bulk_import()
 
         view.log("Import completed successfully.", self.args.quiet)
 

@@ -78,7 +78,7 @@ def test_json_and_jsonl_schema_matches_for_same_mode(
         record = model.process_prefetch_file(fake_prefetch, "host01,prefetch")
 
     class Model:
-        def __init__(self, input_path):
+        def __init__(self, input_path, input_diagnostics=()):
             pass
 
         def gen_records(self, **kwargs):
@@ -91,7 +91,7 @@ def test_json_and_jsonl_schema_matches_for_same_mode(
     outputs = {}
     for output_format in ("json", "jsonl"):
         presenter = module.Prefetch2jsonPresenter(
-            str(tmp_path / "input.pf"),
+            str(fake_prefetch),
             str(tmp_path / f"output.{output_format}"),
             is_quiet=True,
             timeline_mode=timeline,

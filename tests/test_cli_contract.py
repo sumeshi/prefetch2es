@@ -5,11 +5,6 @@ import sys
 import pytest
 
 
-@pytest.fixture(autouse=True)
-def prepare_prefetch():
-    yield
-
-
 @pytest.mark.parametrize("command", ["Prefetch2jsonView", "Prefetch2esView"])
 @pytest.mark.parametrize("args", [["--size", "0"], ["--size", "-2"], ["--qui"]])
 def test_cli_rejects_invalid_options(monkeypatch, command, args):
@@ -42,14 +37,17 @@ def test_cli_forwards_output_format(tmp_path, monkeypatch, output_format):
 
 @pytest.mark.parametrize("command", ["Prefetch2jsonView", "Prefetch2esView"])
 @pytest.mark.parametrize("kind", ["missing", "empty"])
-def test_cli_invalid_input_is_usage_error(tmp_path, monkeypatch, capsys, command, kind):
+def test_cli_invalid_input_reports_partial_failure(tmp_path, monkeypatch, capsys, command, kind):
     source = tmp_path / "missing.pf" if kind == "missing" else tmp_path
     module = importlib.import_module("prefetch2es.views." + command)
     monkeypatch.setattr(sys, "argv", [command, str(source)])
     with pytest.raises(SystemExit) as error:
         module.entry_point()
-    assert error.value.code == 2
-    assert "completed" not in capsys.readouterr().out
+    assert error.value.code == 1
+    captured = capsys.readouterr()
+    assert "completed" not in captured.out
+    assert str(source) in captured.err
+    assert "Partial extraction" in captured.err
 
 
 @pytest.mark.parametrize("command", ["Prefetch2jsonView", "Prefetch2esView"])

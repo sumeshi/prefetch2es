@@ -2,7 +2,7 @@
 from pathlib import Path
 from typing import Sequence, Union
 
-from prefetch2es.models.Prefetch2es import Prefetch2es
+from prefetch2es.models.Prefetch2es import Prefetch2es, validate_chunk_size
 from prefetch2es.models.ElasticsearchUtils import ElasticsearchUtils
 
 
@@ -10,7 +10,7 @@ class Prefetch2esPresenter(object):
 
     def __init__(
         self,
-        input_path: Path,
+        input_path: Union[Path, Sequence[Path]],
         host: str = "localhost",
         port: int = 9200,
         index: str = "prefetch2es",
@@ -26,7 +26,9 @@ class Prefetch2esPresenter(object):
         tags: Union[str, Sequence[str]] = "",
         verify_certs: bool = True,
         ca_certs: str | None = None,
+        input_diagnostics: Sequence[dict] = (),
     ):
+        validate_chunk_size(chunk_size)
         self.input_path = input_path
         self.host = host
         self.port = port
@@ -43,9 +45,10 @@ class Prefetch2esPresenter(object):
         self.tags = tags
         self.verify_certs = verify_certs
         self.ca_certs = ca_certs
+        self.input_diagnostics = input_diagnostics
 
     def prefetch2es(self):
-        prefetch2es = Prefetch2es(self.input_path)
+        prefetch2es = Prefetch2es(self.input_path, self.input_diagnostics)
 
         # Timeline mode uses specialized record generation
         if self.timeline_mode:
@@ -65,8 +68,12 @@ class Prefetch2esPresenter(object):
 
     def bulk_import(self):
         es = ElasticsearchUtils(
-            hostname=self.host, port=self.port, scheme=self.scheme,
-            login=self.login, pwd=self.pwd, verify_certs=self.verify_certs,
+            hostname=self.host,
+            port=self.port,
+            scheme=self.scheme,
+            login=self.login,
+            pwd=self.pwd,
+            verify_certs=self.verify_certs,
             ca_certs=self.ca_certs,
         )
         chunks = None
@@ -94,4 +101,6 @@ class Prefetch2esPresenter(object):
                 f"Bulk import completed: {batch_count} batches processed",
                 self.is_quiet,
             )
-            self.logger(f"Successfully indexed: {total_success} documents", self.is_quiet)
+            self.logger(
+                f"Successfully indexed: {total_success} documents", self.is_quiet
+            )

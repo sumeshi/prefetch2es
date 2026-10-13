@@ -61,7 +61,7 @@ prefetch2es can process multiple files at once.
 $ prefetch2es file1.pf file2.pf file3.pf
 ```
 
-prefetch2es can recursively process all `.pf` files under a specified directory.
+Both commands recursively discover `.pf` files in directories, case-insensitively.
 
 ```bash
 $ tree .
@@ -94,7 +94,7 @@ $ prefetch2es /pffiles/ # The path is recursively expanded to all .pf files.
   (default: False)
 
 --size:
-  Number of files to process per chunk (default: 500)
+  Maximum documents per output chunk (default: 500)
 
 --host:
   Elasticsearch host address (default: localhost)
@@ -144,7 +144,7 @@ When using from a Python script:
 
 ```python
 if __name__ == '__main__':
-    prefetch2es('/path/to/your/file.pf', host='localhost', port=9200, index='foobar', size=500)
+    prefetch2es('/path/to/your/file.pf', host='localhost', port=9200, index='foobar', chunk_size=500)
 ```
 
 With Elasticsearch authentication:
@@ -198,6 +198,13 @@ if __name__ == '__main__':
     filepath = '/path/to/your/file.pf'
     result: list[dict] = prefetch2json(filepath)
 ```
+
+Input and extraction errors are reported to stderr while remaining inputs are
+processed. Partial extraction exits 1, even with `--quiet`; output and
+Elasticsearch errors stop processing.
+
+Python APIs raise `PartialExtractionError` on recovered partial results;
+JSON APIs expose completed records in the exception's `records` attribute.
 
 With timeline analysis and custom tags:
 

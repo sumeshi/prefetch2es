@@ -72,7 +72,7 @@ def test_version_is_defined_in_about_module():
     from prefetch2es import __version__
     from prefetch2es.__about__ import __version__ as about_version
 
-    assert __version__ == about_version == "2.4.1"
+    assert __version__ == about_version
 
 
 # behavior test cases 

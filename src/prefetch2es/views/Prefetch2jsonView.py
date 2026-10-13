@@ -1,9 +1,9 @@
 # coding: utf-8
 import sys
-from pathlib import Path
 from multiprocessing import cpu_count
 
 from prefetch2es.views.BaseView import BaseView
+from prefetch2es.models.Prefetch2es import get_prefetch_files
 from prefetch2es.presenters.Prefetch2jsonPresenter import Prefetch2jsonPresenter
 
 
@@ -49,17 +49,19 @@ class Prefetch2jsonView(BaseView):
 
     def run(self):
         view = self
-        source = Path(self.args.prefetch_file)
-        if not source.is_file() and not source.is_dir():
-            self.parser.error(
-                f"Input path does not exist or is not a file/directory: {source}"
-            )
-        if source.is_dir() and not any(p.is_file() for p in source.glob("*.pf")):
-            self.parser.error(f"No Prefetch files found: {source}")
+        input_diagnostics = []
+        input_files = get_prefetch_files(
+            [self.args.prefetch_file], input_diagnostics
+        )
         view.log(f"Converting {self.args.prefetch_file}.", self.args.quiet)
 
         if self.args.multiprocess:
-            view.log(f"Multiprocessing enabled ({cpu_count()} workers).", self.args.quiet)
+            message = (
+                f"Multiprocessing enabled (up to {min(cpu_count(), len(input_files))} workers)."
+                if len(input_files) > 1
+                else "One input file; processing serially."
+            )
+            view.log(message, self.args.quiet)
 
         if self.args.timeline:
             view.log("Timeline analysis mode enabled", self.args.quiet)
@@ -73,6 +75,8 @@ class Prefetch2jsonView(BaseView):
             timeline_mode=self.args.timeline,
             tags=self.args.tags,
             output_format=self.args.format,
+            input_files=input_files,
+            input_diagnostics=input_diagnostics,
         ).export_json()
 
         view.log("Conversion completed successfully.", self.args.quiet)

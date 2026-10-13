@@ -5,6 +5,9 @@ on:
     branches:
       - master
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -15,30 +18,30 @@ jobs:
         python-version: ['3.13']
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
-          pip install uv
+          uv sync --locked
 
       - name: Get version
         id: get_version
         run: |
-          version=$(python -c "import re; from pathlib import Path; print(re.search(r'__version__\s*=\s*\"([^\"]+)\"', Path('src/prefetch2es/__about__.py').read_text()).group(1))")
+          version=$(uv run --locked python -c "import re; from pathlib import Path; print(re.search(r'__version__\s*=\s*\"([^\"]+)\"', Path('src/prefetch2es/__about__.py').read_text()).group(1))")
           echo "version=$version" >> $GITHUB_ENV
         shell: bash
 
       - name: run python
         run: |
-          uv run prefetch2es -h
-          uv run prefetch2es -v
-          uv run prefetch2json -h
-          uv run prefetch2json -v
+          uv run --locked prefetch2es -h
+          uv run --locked prefetch2es -v
+          uv run --locked prefetch2json -h
+          uv run --locked prefetch2json -v
       
       - name: Prepare corresponding sources and build libscca
         run: uv run --locked python .github/prepare_release_sources.py dist/sources
@@ -78,11 +81,11 @@ jobs:
           mv dist/prefetch2json.exe "$bundle/prefetch2json.exe"
           cp dist/LICENSES.txt "$bundle/LICENSES.txt"
           cp -R dist/sources "$bundle/sources"
-          python -c "import shutil; shutil.make_archive(r'$bundle', 'zip', root_dir=r'$bundle')"
+          uv run --no-sync python -c "import shutil; shutil.make_archive(r'$bundle', 'zip', root_dir=r'$bundle')"
         shell: bash
 
       - name: create release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3.0.3
         with:
           tag_name: v${{ steps.create_tag.outputs.version }}
           files: |
@@ -102,24 +105,24 @@ jobs:
       version: ${{ needs.build-windows.outputs.version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
           sudo apt install patchelf build-essential
-          pip install uv
+          uv sync --locked
 
       - name: run python
         run: |
-          uv run prefetch2es -h
-          uv run prefetch2es -v
-          uv run prefetch2json -h
-          uv run prefetch2json -v
+          uv run --locked prefetch2es -h
+          uv run --locked prefetch2es -v
+          uv run --locked prefetch2json -h
+          uv run --locked prefetch2json -v
 
       - name: Prepare corresponding sources and build libscca
         run: uv run --locked python .github/prepare_release_sources.py dist/sources
@@ -129,7 +132,6 @@ jobs:
 
       - name: build
         run: |
-          pip install nuitka
           uv run --no-sync python -m nuitka --standalone --onefile --follow-imports -o prefetch2es --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2esView.py
           uv run --no-sync python -m nuitka --standalone --onefile --follow-imports -o prefetch2json --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2jsonView.py
       
@@ -148,11 +150,11 @@ jobs:
           mv dist/prefetch2json "$bundle/prefetch2json"
           cp dist/LICENSES.txt "$bundle/LICENSES.txt"
           cp -R dist/sources "$bundle/sources"
-          python -c "import shutil; shutil.make_archive(r'$bundle', 'zip', root_dir=r'$bundle')"
+          uv run --no-sync python -c "import shutil; shutil.make_archive(r'$bundle', 'zip', root_dir=r'$bundle')"
         shell: bash
 
       - name: upload asset to release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3.0.3
         with:
           tag_name: v${{ needs.build-windows.outputs.version }}
           files: |

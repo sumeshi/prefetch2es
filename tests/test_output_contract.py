@@ -1,18 +1,14 @@
 """Offline output and reliability contracts (no forensic fixture download)."""
 import importlib
 import json
+import os
+import stat
 
 import pytest
 
 from prefetch2es.presenters.Prefetch2jsonPresenter import Prefetch2jsonPresenter
 
 json_module = importlib.import_module("prefetch2es.presenters.Prefetch2jsonPresenter")
-
-
-@pytest.fixture(autouse=True)
-def prepare_prefetch():
-    """Override legacy network setup for this focused unit module."""
-    yield
 
 
 @pytest.mark.parametrize("output_format", ["jsonl", "ndjson"])
@@ -24,7 +20,7 @@ def test_jsonl_streams_utf8_records(tmp_path, monkeypatch, output_format, timeli
     closed = []
 
     class Model:
-        def __init__(self, path):
+        def __init__(self, path, input_diagnostics=()):
             pass
 
         def gen_records(self, **kwargs):
@@ -73,3 +69,23 @@ def test_default_output_does_not_collide_with_directory(tmp_path):
 def test_invalid_output_format_rejected(tmp_path):
     with pytest.raises(ValueError, match="format"):
         Prefetch2jsonPresenter(tmp_path, "", output_format="yaml")
+
+
+@pytest.mark.parametrize("output_format", ["json", "jsonl"])
+def test_atomic_export_preserves_existing_permissions(tmp_path, monkeypatch, output_format):
+    if os.name != "posix":
+        pytest.skip("Requires POSIX file permissions")
+    model = importlib.import_module("prefetch2es.models.Prefetch2es")
+    source = tmp_path / "input.pf"
+    source.write_bytes(b"synthetic")
+    output = tmp_path / "output.json"
+    output.write_bytes(b"previous output")
+    output.chmod(0o664)
+    monkeypatch.setattr(
+        model, "process_prefetch_file", lambda path, tags: {"source_file": str(path)}
+    )
+    Prefetch2jsonPresenter(
+        source, str(output), output_format=output_format, is_quiet=True
+    ).export_json()
+    assert stat.S_IMODE(output.stat().st_mode) == 0o664
+    assert output.read_bytes() != b"previous output"

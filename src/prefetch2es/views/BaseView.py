@@ -39,7 +39,7 @@ class BaseView(metaclass=ABCMeta):
             "-s",
             type=positive_int,
             default=500,
-            help="Number of files to process in each chunk.",
+            help="Maximum documents per output chunk.",
         )
 
     @abstractmethod
