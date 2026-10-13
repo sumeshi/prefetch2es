@@ -2,6 +2,7 @@
 from hashlib import md5, sha256
 import json
 from pathlib import Path
+from shutil import copytree
 
 import pytest
 from prefetch2es.views.Prefetch2esView import entry_point as p2e
@@ -15,14 +16,17 @@ def calc_md5(path: Path) -> str:
         return md5(path.read_bytes()).hexdigest()
 
 
-def assert_content(path: str, count: int, digest: str, basename_paths: bool = False) -> None:
+def assert_content(path: str, count: int, digest: str, timeline: bool = False) -> None:
     # Verified against the committed presenter with the MD5-checked samples.
     # JSON object key order is not part of the record contract.
     records = json.loads(Path(path).read_bytes())
     assert len(records) == count
-    if basename_paths:
-        for record in records:
+    # Evidence directories depend on the checkout or temporary test directory.
+    for record in records:
+        if timeline:
             record['log']['file']['path'] = Path(record['log']['file']['path']).name
+        else:
+            record['source_file'] = Path(record['source_file']).name
     canonical = json.dumps(
         sorted(records, key=lambda record: json.dumps(record, sort_keys=True)),
         sort_keys=True, separators=(',', ':'), ensure_ascii=False,
@@ -30,7 +34,7 @@ def assert_content(path: str, count: int, digest: str, basename_paths: bool = Fa
     assert sha256(canonical).hexdigest() == digest
 
 
-NORMAL_DIGEST = '7a1c8de960a3e2ec885d2de6fd9ae0aacf5bd62fd8d8062f3aea6ed0705f524b'
+NORMAL_DIGEST = '5c390eaede713c89f0fed925dd183ea19c8bf12258dde4d6a653d6fc8f04c615'
 TIMELINE_DIGEST = 'd7c73eb02fba664788359215d0700ab98a687c0e83a270a968d9b1e485f32696'
 
 
@@ -77,9 +81,10 @@ def test_version_is_defined_in_about_module():
 
 # behavior test cases 
 @pytest.mark.usefixtures("prepare_prefetch")
-def test__prefetch2json_convert(monkeypatch):
-    path = 'tests/cache/prefetches.json'
-    argv = ["prefetch2json", "-o", path, "tests/cache/"]
+def test__prefetch2json_convert(monkeypatch, tmp_path):
+    input_path = copytree('tests/cache', tmp_path / 'cache')
+    path = str(tmp_path / 'prefetches.json')
+    argv = ["prefetch2json", "-o", path, str(input_path)]
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         p2j()
@@ -101,7 +106,7 @@ def test__prefetch2json_timeline_convert(monkeypatch):
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         p2j()
-    assert_content(path, 29, TIMELINE_DIGEST, basename_paths=True)
+    assert_content(path, 29, TIMELINE_DIGEST, timeline=True)
 
 @pytest.mark.usefixtures("prepare_prefetch")
 def test__prefetch2json_timeline_convert_multiprocessing(monkeypatch):
@@ -110,4 +115,4 @@ def test__prefetch2json_timeline_convert_multiprocessing(monkeypatch):
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         p2j()
-    assert_content(path, 29, TIMELINE_DIGEST, basename_paths=True)
+    assert_content(path, 29, TIMELINE_DIGEST, timeline=True)
