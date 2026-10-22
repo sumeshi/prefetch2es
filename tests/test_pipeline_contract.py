@@ -82,12 +82,13 @@ def test_pool_uses_one_task_per_file_and_caps_workers(tmp_path, monkeypatch):
     pool = MagicMock()
     pool.__enter__.return_value = pool
 
-    def imap(process, inputs, chunksize):
-        assert list(inputs) == files
-        assert chunksize == 1
-        return map(process, files)
+    def apply_async(process, args):
+        assert len(args) == 1
+        result = MagicMock()
+        result.get.return_value = process(*args)
+        return result
 
-    pool.imap.side_effect = imap
+    pool.apply_async.side_effect = apply_async
     context = MagicMock()
     context.Pool.return_value = pool
     monkeypatch.setattr(model, "process_prefetch_task", synthetic_task)
@@ -102,6 +103,7 @@ def test_pool_uses_one_task_per_file_and_caps_workers(tmp_path, monkeypatch):
             chunk_size=500,
         )
     ] == [3]
+    assert [call.args[1][0] for call in pool.apply_async.call_args_list] == files
     context.Pool.assert_called_once_with(3)
     pool.__exit__.assert_called_once()
 

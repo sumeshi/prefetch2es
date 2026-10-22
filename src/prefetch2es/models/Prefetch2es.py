@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Generator, Iterable, Union, Sequence
 import multiprocessing as mp
+from collections import deque
 from functools import partial
 
 
@@ -299,6 +300,17 @@ def process_prefetch_task(filepath: Path, tags="", timeline_mode=False):
         return filepath, [], error
 
 
+def _ordered_pool_results(pool, process, files, max_pending):
+    """Bound outstanding file tasks while yielding their results in input order."""
+    pending = deque()
+    for filepath in files:
+        pending.append(pool.apply_async(process, (filepath,)))
+        if len(pending) >= max_pending:
+            yield pending.popleft().get()
+    while pending:
+        yield pending.popleft().get()
+
+
 class Prefetch2es(SafeMultiprocessingMixin):
     """Prefetch file processor with multiprocessing support"""
 
@@ -382,9 +394,10 @@ class Prefetch2es(SafeMultiprocessingMixin):
 
         if multiprocess and len(files) > 1:
             ctx = self.get_multiprocessing_context()
-            with ctx.Pool(min(self.get_cpu_count(), len(files))) as pool:
+            workers = min(self.get_cpu_count(), len(files))
+            with ctx.Pool(workers) as pool:
                 yield from self._batch_records(
-                    pool.imap(process, files, chunksize=1),
+                    _ordered_pool_results(pool, process, files, workers * 2),
                     chunk_size,
                 )
         else:
