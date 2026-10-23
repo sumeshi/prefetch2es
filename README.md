@@ -15,7 +15,7 @@ A command-line tool for parsing Windows Prefetch files and importing the results
 - Process a single file, multiple files, or a directory of `.pf` files
 - Import parsed records into Elasticsearch (`prefetch2es`)
 - Export parsed records as JSON or JSONL (`prefetch2json`)
-- Generate timeline-oriented records for forensic analysis (`--timeline`)
+- Generate timeline-oriented records for forensic analysis by default
 
 
 ## Installation
@@ -111,9 +111,9 @@ $ prefetch2es /pffiles/ # The path is recursively expanded to all .pf files.
 --pipeline:
   Elasticsearch ingest pipeline to use (default: )
 
---timeline:
-  Enable timeline analysis mode for forensic investigation
-  (default: False)
+--timeline, --no-timeline:
+  Generate timeline records (default: True).
+  Use --no-timeline for Standard records.
 
 --tags:
   Comma-separated tags to add to records in Standard and Timeline modes
@@ -214,8 +214,8 @@ $ prefetch2json /path/to/your/file.pf --timeline --tags="WORKSTATION-01,FINANCE"
 
 ### Timeline Analysis
 
-Standard mode creates one record per Prefetch file.
-Timeline mode creates one record per recorded execution timestamp.
+Standard mode (`--no-timeline`) creates one record per Prefetch file.
+Timeline mode (default) creates one record per recorded execution timestamp.
 
 ```bash
 $ prefetch2es /path/to/your/file.pf --timeline --index=prefetch-timeline

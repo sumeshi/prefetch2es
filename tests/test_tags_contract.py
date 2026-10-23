@@ -99,7 +99,7 @@ def test_json_and_jsonl_schema_matches_for_same_mode(
             output_format=output_format,
         )
         presenter.export_json()
-        data = presenter.output_path.read_text()
+        data = presenter.output_path.read_text(encoding="utf-8")
         outputs[output_format] = (
             json.loads(data) if output_format == "json" else [json.loads(data)]
         )
@@ -178,7 +178,7 @@ def test_json_and_es_preserve_the_same_absolute_evidence_path(
     Prefetch2jsonPresenter(
         supplied, str(output), is_quiet=True, timeline_mode=timeline
     ).export_json()
-    exported = json.loads(output.read_text())
+    exported = json.loads(output.read_text(encoding="utf-8"))
     for path in (supplied, supplied.resolve()):
         presenter = Prefetch2esPresenter(path, is_quiet=True, timeline_mode=timeline)
         records = [record for chunk in presenter.prefetch2es() for record in chunk]

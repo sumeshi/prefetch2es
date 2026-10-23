@@ -85,7 +85,7 @@ def test_atomic_export_preserves_existing_permissions(tmp_path, monkeypatch, out
         model, "process_prefetch_file", lambda path, tags: {"source_file": str(path)}
     )
     Prefetch2jsonPresenter(
-        source, str(output), output_format=output_format, is_quiet=True
+        source, str(output), output_format=output_format, is_quiet=True, timeline_mode=False
     ).export_json()
     assert stat.S_IMODE(output.stat().st_mode) == 0o664
     assert output.read_bytes() != b"previous output"

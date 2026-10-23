@@ -1,0 +1,15 @@
+{
+  "fixture": "calc-win10.bin",
+  "source_repository": "EricZimmerman/Prefetch",
+  "source_commit": "841212266356a9121a1c34ee538cbce2bb2b9cf3",
+  "source_path": "Prefetch.Test/TestFiles/Win10/CALC.EXE-3FBEF7FD.pf",
+  "source_url": "https://github.com/EricZimmerman/Prefetch/blob/841212266356a9121a1c34ee538cbce2bb2b9cf3/Prefetch.Test/TestFiles/Win10/CALC.EXE-3FBEF7FD.pf",
+  "source_git_blob_sha1": "0035fe1b6ed81734b26cfa67dd088ff8fa0a5c5b",
+  "source_sha256": "e1d11876560511788c58e957d302a4a953e8cd8e8d7c0290796393058c164319",
+  "fixture_sha256": "e1d11876560511788c58e957d302a4a953e8cd8e8d7c0290796393058c164319",
+  "license_file": "LICENSE-Prefetch.txt",
+  "license_source_url": "https://github.com/EricZimmerman/Prefetch/blob/841212266356a9121a1c34ee538cbce2bb2b9cf3/license",
+  "license_scope": "Root repository license supplied as attribution; no separate artifact-specific license notice was found.",
+  "changes": [],
+  "origin": "Unmodified Windows-captured Prefetch sample."
+}
