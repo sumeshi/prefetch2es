@@ -27,7 +27,7 @@ def prefetch2es(
     pwd: str = "",
     multiprocess: bool = False,
     chunk_size: int = 500,
-    timeline_mode: bool = False,
+    timeline_mode: bool = True,
     tags: Union[str, Sequence[str]] = "",
 ) -> None:
     """Import Windows Prefetch records into Elasticsearch.
@@ -63,7 +63,7 @@ def prefetch2es(
             Maximum documents per output chunk.
 
         timeline_mode (bool, optional):
-            Enable timeline analysis mode and create specialized timeline
+            Enable timeline analysis mode (default: True) and create specialized timeline
             records for Prefetch execution events.
 
         tags (str or Sequence[str], optional):
@@ -93,7 +93,7 @@ def prefetch2json(
     filepath: str,
     multiprocess: bool = False,
     chunk_size: int = 500,
-    timeline_mode: bool = False,
+    timeline_mode: bool = True,
     tags: Union[str, Sequence[str]] = "",
 ) -> List[dict]:
     """Convert Windows Prefetch files to a list of dictionaries.
@@ -102,7 +102,7 @@ def prefetch2json(
         filepath (str): Input Prefetch file or directory.
         multiprocess (bool): Flag to run multiprocessing.
         chunk_size (int): Maximum documents per output chunk.
-        timeline_mode (bool): Enable timeline analysis mode.
+        timeline_mode (bool): Enable timeline analysis mode (default: True).
         tags (str or Sequence[str]): Comma-separated string or sequence of tags.
 
     Note:

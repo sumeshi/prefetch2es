@@ -5,11 +5,14 @@ import stat
 from datetime import datetime
 from pathlib import Path
 from typing import List, Generator, Iterable, Union, Sequence
-import multiprocessing as mp
 from functools import partial
 
 
 import pyscca
+
+from .MultiprocessingUtils import SafeMultiprocessingMixin
+from .MultiprocessingUtils import mp as mp
+from .MultiprocessingUtils import ordered_pool_results as _ordered_pool_results
 
 FILETIME_ZERO = datetime(1601, 1, 1, 0, 0, 0)
 
@@ -33,32 +36,6 @@ def normalize_tags(tags: Union[str, Sequence[str], None]) -> List[str]:
         if tag not in result:
             result.append(tag)
     return result
-
-
-class SafeMultiprocessingMixin:
-    """Safe multiprocessing management class for Python 3.13 compatibility"""
-
-    @staticmethod
-    def get_multiprocessing_context() -> mp.context.BaseContext:
-        """Get safe multiprocessing context"""
-        # Use spawn for Python 3.13+ or test environments to avoid fork() issues
-        if sys.version_info >= (3, 13) or "pytest" in sys.modules:
-            try:
-                ctx = mp.get_context("spawn")
-            except RuntimeError:
-                ctx = mp.get_context()
-        else:
-            ctx = mp.get_context()
-
-        return ctx
-
-    @staticmethod
-    def get_cpu_count() -> int:
-        """Get CPU count safely"""
-        try:
-            return mp.cpu_count()
-        except NotImplementedError:
-            return os.cpu_count() or 1
 
 
 def safe_last_run_times(p: pyscca.file) -> List[str]:
@@ -382,9 +359,10 @@ class Prefetch2es(SafeMultiprocessingMixin):
 
         if multiprocess and len(files) > 1:
             ctx = self.get_multiprocessing_context()
-            with ctx.Pool(min(self.get_cpu_count(), len(files))) as pool:
+            workers = min(self.get_cpu_count(), len(files))
+            with ctx.Pool(workers) as pool:
                 yield from self._batch_records(
-                    pool.imap(process, files, chunksize=1),
+                    _ordered_pool_results(pool, process, files, workers * 2),
                     chunk_size,
                 )
         else:

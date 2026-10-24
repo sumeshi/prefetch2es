@@ -25,7 +25,7 @@ class Prefetch2jsonPresenter(object):
         is_quiet: bool = False,
         multiprocess: bool = False,
         chunk_size: int = 500,
-        timeline_mode: bool = False,
+        timeline_mode: bool = True,
         tags: Union[str, Sequence[str]] = "",
         output_format: str = "json",
         input_files: Sequence[Path] | None = None,

@@ -1,4 +1,5 @@
 # coding: utf-8
+from argparse import BooleanOptionalAction
 import sys
 from typing import List
 from pathlib import Path
@@ -60,16 +61,9 @@ class Prefetch2esView(BaseView):
         )
         self.parser.add_argument(
             "--timeline",
-            action="store_true",
-            help="Enable timeline analysis mode (separate records by type).",
-        )
-        self.parser.add_argument(
-            "--tags",
-            default="",
-            help=(
-                "Comma-separated tags to add to each record "
-                "(e.g., hostname, domain name)."
-            ),
+            action=BooleanOptionalAction,
+            default=True,
+            help="Use timeline records (default); --no-timeline selects Standard records.",
         )
 
     def __list_prefetch_files(self, prefetch_files: List[str]) -> List[Path]:
@@ -119,7 +113,7 @@ class Prefetch2esView(BaseView):
 
 def entry_point():
     try:
-        Prefetch2esView().run()
+        BaseView.run_entry_point(Prefetch2esView)
     except Exception as error:
         print(f"Error: {error}", file=sys.stderr)
         raise SystemExit(1) from error

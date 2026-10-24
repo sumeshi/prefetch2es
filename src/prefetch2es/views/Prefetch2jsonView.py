@@ -1,4 +1,5 @@
 # coding: utf-8
+from argparse import BooleanOptionalAction
 import sys
 from multiprocessing import cpu_count
 
@@ -38,13 +39,9 @@ class Prefetch2jsonView(BaseView):
         )
         self.parser.add_argument(
             "--timeline",
-            action="store_true",
-            help="Enable timeline analysis mode (separate records by type).",
-        )
-        self.parser.add_argument(
-            "--tags",
-            default="",
-            help="Comma-separated tags for Standard and Timeline records.",
+            action=BooleanOptionalAction,
+            default=True,
+            help="Use timeline records (default); --no-timeline selects Standard records.",
         )
 
     def run(self):
@@ -84,7 +81,7 @@ class Prefetch2jsonView(BaseView):
 
 def entry_point():
     try:
-        Prefetch2jsonView().run()
+        BaseView.run_entry_point(Prefetch2jsonView)
     except Exception as error:
         print(f"Error: {error}", file=sys.stderr)
         raise SystemExit(1) from error

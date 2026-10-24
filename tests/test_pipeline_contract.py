@@ -57,8 +57,7 @@ def test_es_cli_shares_client_and_batches_across_files(
     argv = ["prefetch2es", str(tmp_path), str(files[0]), "--size", "2", "--quiet"]
     if multiprocess:
         argv.append("--multiprocess")
-    if timeline:
-        argv.append("--timeline")
+    argv.append("--timeline" if timeline else "--no-timeline")
     monkeypatch.setattr("sys.argv", argv)
     module.entry_point()
 
@@ -82,12 +81,13 @@ def test_pool_uses_one_task_per_file_and_caps_workers(tmp_path, monkeypatch):
     pool = MagicMock()
     pool.__enter__.return_value = pool
 
-    def imap(process, inputs, chunksize):
-        assert list(inputs) == files
-        assert chunksize == 1
-        return map(process, files)
+    def apply_async(process, args):
+        assert len(args) == 1
+        result = MagicMock()
+        result.get.return_value = process(*args)
+        return result
 
-    pool.imap.side_effect = imap
+    pool.apply_async.side_effect = apply_async
     context = MagicMock()
     context.Pool.return_value = pool
     monkeypatch.setattr(model, "process_prefetch_task", synthetic_task)
@@ -102,6 +102,7 @@ def test_pool_uses_one_task_per_file_and_caps_workers(tmp_path, monkeypatch):
             chunk_size=500,
         )
     ] == [3]
+    assert [call.args[1][0] for call in pool.apply_async.call_args_list] == files
     context.Pool.assert_called_once_with(3)
     pool.__exit__.assert_called_once()
 
@@ -143,7 +144,7 @@ def test_unreadable_subdirectory_keeps_good_records_and_reports_partial_failure(
         output = tmp_path / "output.jsonl"
         monkeypatch.setattr(
             "sys.argv",
-            ["prefetch2json", str(source), "--format", "jsonl", "-o", str(output), "-q"],
+            ["prefetch2json", str(source), "--no-timeline", "--format", "jsonl", "-o", str(output), "-q"],
         )
         with pytest.raises(SystemExit) as exited:
             module.entry_point()
@@ -171,8 +172,7 @@ def test_nested_uppercase_json_cli_matches_es(tmp_path, monkeypatch, timeline):
     monkeypatch.setattr(model, "process_prefetch_task", synthetic_task)
     json_view = importlib.import_module("prefetch2es.views.Prefetch2jsonView")
     argv = ["prefetch2json", str(source), "--format", "jsonl", "-o", str(output), "-q"]
-    if timeline:
-        argv.append("--timeline")
+    argv.append("--timeline" if timeline else "--no-timeline")
     monkeypatch.setattr("sys.argv", argv)
     json_view.entry_point()
     exported = [json.loads(line) for line in output.read_text().splitlines()]
@@ -233,8 +233,7 @@ def test_jsonl_cli_good_bad_good_partial_output_and_atomic_publish(
     ]
     if multiprocess:
         argv.append("--multiprocess")
-    if timeline:
-        argv.append("--timeline")
+    argv.append("--timeline" if timeline else "--no-timeline")
     monkeypatch.setattr("sys.argv", argv)
     with pytest.raises(SystemExit) as exited:
         module.entry_point()
@@ -274,8 +273,7 @@ def test_es_file_failure_processes_remaining_files_then_exits_nonzero(
     argv = ["prefetch2es", *map(str, files), str(missing), "--quiet", "--size", "1"]
     if multiprocess:
         argv.append("--multiprocess")
-    if timeline:
-        argv.append("--timeline")
+    argv.append("--timeline" if timeline else "--no-timeline")
     monkeypatch.setattr("sys.argv", argv)
     with pytest.raises(SystemExit) as exited:
         module.entry_point()
@@ -401,7 +399,7 @@ def test_partial_python_api_exposes_records_and_diagnostics(tmp_path, monkeypatc
     monkeypatch.setattr(model, "process_prefetch_task", synthetic_task)
     monkeypatch.setattr(model.Prefetch2es, "_get_prefetch_files", lambda self: files)
     with pytest.raises(PartialExtractionError) as partial:
-        prefetch2json(str(tmp_path))
+        prefetch2json(str(tmp_path), timeline_mode=False)
     assert [record["source_file"] for record in partial.value.records] == [
         str(files[0]),
         str(files[2]),

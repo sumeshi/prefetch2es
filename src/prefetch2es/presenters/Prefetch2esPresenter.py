@@ -22,7 +22,7 @@ class Prefetch2esPresenter(object):
         multiprocess: bool = False,
         chunk_size: int = 500,
         logger=None,
-        timeline_mode: bool = False,
+        timeline_mode: bool = True,
         tags: Union[str, Sequence[str]] = "",
         verify_certs: bool = True,
         ca_certs: str | None = None,

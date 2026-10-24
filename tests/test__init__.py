@@ -84,7 +84,7 @@ def test_version_is_defined_in_about_module():
 def test__prefetch2json_convert(monkeypatch, tmp_path):
     input_path = copytree('tests/cache', tmp_path / 'cache')
     path = str(tmp_path / 'prefetches.json')
-    argv = ["prefetch2json", "-o", path, str(input_path)]
+    argv = ["prefetch2json", "--no-timeline", "-o", path, str(input_path)]
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         p2j()
@@ -93,7 +93,7 @@ def test__prefetch2json_convert(monkeypatch, tmp_path):
 @pytest.mark.usefixtures("prepare_prefetch")
 def test__prefetch2json_convert_multiprocessing(monkeypatch):
     path = 'tests/cache/prefetches-m.json'
-    argv = ["prefetch2json", "-o", path, "-m", "tests/cache/"]
+    argv = ["prefetch2json", "--no-timeline", "-o", path, "-m", "tests/cache/"]
     with monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
         p2j()
