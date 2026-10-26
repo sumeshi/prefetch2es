@@ -123,6 +123,30 @@ def process_prefetch_file_timeline(
             base_tags = normalize_tags(tags)
             last_exec_times = safe_last_run_times(p)
 
+            if not last_exec_times:
+                return []
+
+            executable_name = p.executable_filename
+            exec_count = p.run_count
+            prefetch_hash = format(p.prefetch_hash, "x").upper()
+            format_version = p.format_version
+            volumes = [
+                {
+                    "path": volume.device_path,
+                    "creation_time": f"{volume.get_creation_time()}Z".replace(" ", "T"),
+                    "serial_number": format(volume.serial_number, "x").upper(),
+                }
+                for volume in p.volumes
+            ]
+            metrics = [
+                {
+                    "filename": metric.filename,
+                    "file_reference": hex(metric.file_reference).upper(),
+                }
+                for metric in p.file_metrics_entries
+            ]
+            source_file = str(filepath)
+
             timeline_records = []
             for exec_time in last_exec_times:
                 timeline_records.append(
@@ -138,40 +162,19 @@ def process_prefetch_file_timeline(
                             "dataset": "windows.prefetch",
                         },
                         "process": {
-                            "name": p.executable_filename,
+                            "name": executable_name,
                             "start": exec_time,
                         },
                         "windows": {
                             "prefetch": {
-                                "exec_count": p.run_count,
-                                "hash": {
-                                    "prefetch": format(p.prefetch_hash, "x").upper()
-                                },
-                                "format_version": p.format_version,
-                                "volumes": [
-                                    {
-                                        "path": volume.device_path,
-                                        "creation_time": f"{volume.get_creation_time()}Z".replace(
-                                            " ", "T"
-                                        ),
-                                        "serial_number": format(
-                                            volume.serial_number, "x"
-                                        ).upper(),
-                                    }
-                                    for volume in p.volumes
-                                ],
-                                "metrics": [
-                                    {
-                                        "filename": metrics.filename,
-                                        "file_reference": hex(
-                                            metrics.file_reference
-                                        ).upper(),
-                                    }
-                                    for metrics in p.file_metrics_entries
-                                ],
+                                "exec_count": exec_count,
+                                "hash": {"prefetch": prefetch_hash},
+                                "format_version": format_version,
+                                "volumes": [volume.copy() for volume in volumes],
+                                "metrics": [metric.copy() for metric in metrics],
                             }
                         },
-                        "log": {"file": {"path": str(filepath)}},
+                        "log": {"file": {"path": source_file}},
                         "tags": base_tags,
                     }
                 )
