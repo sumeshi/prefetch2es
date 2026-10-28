@@ -96,7 +96,8 @@ def run_extra_cases(client, transport, new_index, stored_documents, document_id)
             assert len(recovered) == len(diagnostics) == 1
             assert diagnostics[0]["timestamp_index"] == 0
             assert diagnostics[0]["raw"] == 2**64 - 1
-            index = new_index(f"timestamp-recovery-{timeline}")
+            mode = "timeline" if timeline else "standard"
+            index = new_index(f"timestamp-recovery-{mode}")
             try:
                 prefetch2es(
                     str(source),

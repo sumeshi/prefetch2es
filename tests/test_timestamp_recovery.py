@@ -53,6 +53,13 @@ def test_native_direct_processor_exposes_recovered_records_and_raw_time(
     times = [VALID, VALID + 10000000]
     times[invalid_index] = INVALID
     source = FIXTURE(tmp_path, times)
+    native = model.pyscca.file()
+    try:
+        native.open(str(source))
+        with pytest.raises(ValueError) as native_error:
+            native.get_last_run_time(invalid_index)
+    finally:
+        native.close()
     process = (
         model.process_prefetch_file_timeline
         if timeline
@@ -78,7 +85,7 @@ def test_native_direct_processor_exposes_recovered_records_and_raw_time(
             "stage": "last_run_time",
             "timestamp_index": invalid_index,
             "raw": INVALID,
-            "error": "ValueError: year 60056 is out of range",
+            "error": f"ValueError: {native_error.value}",
         }
     ]
     transported = pickle.loads(pickle.dumps(error))
