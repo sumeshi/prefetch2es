@@ -1,11 +1,13 @@
 """Prefetch execution times and metrics survive real ES indexing."""
 
 from copy import deepcopy
+import os
 from pathlib import Path
 import runpy
 from tempfile import TemporaryDirectory
+from urllib.parse import unquote, urlsplit
 
-from prefetch2es import prefetch2json
+from prefetch2es import PartialExtractionError, prefetch2es, prefetch2json
 
 
 def expected_source(document):
@@ -76,3 +78,49 @@ def run_extra_cases(client, transport, new_index, stored_documents, document_id)
         )["count"]
         == 2
     )
+    address = urlsplit(os.environ["ELASTICSEARCH_URL"])
+    with TemporaryDirectory() as directory:
+        source = artifact["create_timestamp_artifact"](
+            Path(directory), [2**64 - 1, 130968655538095417]
+        )
+        for timeline in (False, True):
+            try:
+                prefetch2json(str(source), timeline_mode=timeline)
+            except PartialExtractionError as error:
+                recovered = error.records
+                diagnostics = error.diagnostics
+            else:
+                raise AssertionError(
+                    "An invalid timestamp must report partial extraction"
+                )
+            assert len(recovered) == len(diagnostics) == 1
+            assert diagnostics[0]["timestamp_index"] == 0
+            assert diagnostics[0]["raw"] == 2**64 - 1
+            index = new_index(f"timestamp-recovery-{timeline}")
+            try:
+                prefetch2es(
+                    str(source),
+                    host=address.hostname,
+                    port=address.port or (443 if address.scheme == "https" else 80),
+                    scheme=address.scheme,
+                    login=unquote(address.username or ""),
+                    pwd=unquote(address.password or ""),
+                    index=index,
+                    timeline_mode=timeline,
+                    chunk_size=1,
+                )
+            except PartialExtractionError as error:
+                assert error.diagnostics == diagnostics
+            else:
+                raise AssertionError("ES ingestion must also report partial extraction")
+            assert stored_documents(client, index) == {
+                document_id(record): record for record in recovered
+            }
+            field = "@timestamp" if timeline else "last_exec_times"
+            assert (
+                client.count(
+                    index=index,
+                    query={"range": {field: {"gte": "2016-01-01", "lt": "2017-01-01"}}},
+                )["count"]
+                == 1
+            )

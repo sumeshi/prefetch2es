@@ -38,7 +38,9 @@ def normalize_tags(tags: Union[str, Sequence[str], None]) -> List[str]:
     return result
 
 
-def safe_last_run_times(p: pyscca.file) -> List[str]:
+def safe_last_run_times(
+    p: pyscca.file, diagnostics: List[dict] | None = None
+) -> List[str]:
     """Read available last-run timestamps without trusting run_count."""
     times = []
     for i in range(8):
@@ -46,6 +48,20 @@ def safe_last_run_times(p: pyscca.file) -> List[str]:
             value = p.get_last_run_time(i)
         except OSError:
             break
+        except (ValueError, OverflowError) as error:
+            if diagnostics is None:
+                raise
+            diagnostic = {
+                "stage": "last_run_time",
+                "timestamp_index": i,
+                "error": f"{type(error).__name__}: {error}",
+            }
+            try:
+                diagnostic["raw"] = p.get_last_run_time_as_integer(i)
+            except (AttributeError, OSError, ValueError, OverflowError):
+                pass
+            diagnostics.append(diagnostic)
+            continue
         if value is None or value == FILETIME_ZERO:
             continue
         times.append(f"{value}Z".replace(" ", "T"))
@@ -67,9 +83,12 @@ def process_prefetch_file(filepath: Path, tags: Union[str, Sequence[str]] = "") 
             p.open_file_object(file_object)
             # Parse tags from comma-separated string
             base_tags = normalize_tags(tags)
-            last_exec_times = safe_last_run_times(p)
+            diagnostics = []
+            last_exec_times = safe_last_run_times(p, diagnostics)
+            for diagnostic in diagnostics:
+                diagnostic["source_file"] = str(filepath)
 
-            return {
+            record = {
                 "name": p.executable_filename,
                 "filenames": [name for name in p.filenames],
                 "exec_count": p.run_count,
@@ -99,6 +118,9 @@ def process_prefetch_file(filepath: Path, tags: Union[str, Sequence[str]] = "") 
                 "source_file": str(filepath),
                 "tags": base_tags,
             }
+            if diagnostics:
+                raise PartialExtractionError(diagnostics, records=[record])
+            return record
         finally:
             p.close()
 
@@ -121,9 +143,14 @@ def process_prefetch_file_timeline(
             p.open_file_object(file_object)
             # Parse tags from comma-separated string
             base_tags = normalize_tags(tags)
-            last_exec_times = safe_last_run_times(p)
+            diagnostics = []
+            last_exec_times = safe_last_run_times(p, diagnostics)
+            for diagnostic in diagnostics:
+                diagnostic["source_file"] = str(filepath)
 
             if not last_exec_times:
+                if diagnostics:
+                    raise PartialExtractionError(diagnostics, records=[])
                 return []
 
             executable_name = p.executable_filename
@@ -179,6 +206,8 @@ def process_prefetch_file_timeline(
                     }
                 )
 
+            if diagnostics:
+                raise PartialExtractionError(diagnostics, records=timeline_records)
             return timeline_records
         finally:
             p.close()
@@ -265,6 +294,9 @@ class PartialExtractionError(RuntimeError):
             f"Partial extraction: {len(diagnostics)} failure(s); output is incomplete."
         )
 
+    def __reduce__(self):
+        return type(self), (self.diagnostics, self.records)
+
 
 def process_prefetch_task(filepath: Path, tags="", timeline_mode=False):
     """Return one file's records or its serializable processing exception."""
@@ -275,6 +307,8 @@ def process_prefetch_task(filepath: Path, tags="", timeline_mode=False):
             else [process_prefetch_file(filepath, tags)]
         )
         return filepath, records, None
+    except PartialExtractionError as error:
+        return filepath, error.records, error
     except Exception as error:
         return filepath, [], error
 
@@ -383,17 +417,27 @@ class Prefetch2es(SafeMultiprocessingMixin):
         for filepath, records, error in results:
             if error is not None:
                 error_text = f"{type(error).__name__}: {error}"
-                self.diagnostics.append(
-                    {"source_file": str(filepath), "error": error_text}
-                )
+                if isinstance(error, PartialExtractionError):
+                    self.diagnostics.extend(error.diagnostics)
+                    error_text = "; ".join(
+                        f"timestamp[{diagnostic['timestamp_index']}]: "
+                        f"{diagnostic['error']}"
+                        for diagnostic in error.diagnostics
+                    )
+                else:
+                    self.diagnostics.append(
+                        {"source_file": str(filepath), "error": error_text}
+                    )
                 message = (
                     f"Error parsing {filepath}: {error_text} "
                     f"({self.successful_files} file(s) parsed successfully, "
                     f"{self.generated_records} record(s) generated)."
                 )
                 print(message, file=sys.stderr)
-                continue
-            self.successful_files += 1
+                if not isinstance(error, PartialExtractionError):
+                    continue
+            else:
+                self.successful_files += 1
             self.generated_records += len(records)
             for record in records:
                 buffer.append(record)
