@@ -127,6 +127,7 @@ def run_extra_cases(client, transport, new_index, stored_documents, document_id)
             )
 
     run_volume_recovery_cases(client, new_index, stored_documents, document_id)
+    run_unicode_recovery_cases(client, new_index, stored_documents, document_id)
 
 
 def run_volume_recovery_cases(client, new_index, stored_documents, document_id):
@@ -226,3 +227,68 @@ def run_volume_recovery_cases(client, new_index, stored_documents, document_id):
                     )["count"]
                     == 2 * expected_count
                 )
+
+
+def run_unicode_recovery_cases(client, new_index, stored_documents, document_id):
+    """Escaped names remain searchable and exact original code units are stored."""
+    artifact = runpy.run_path(str(Path(__file__).with_name("artifact_fixture.py")))
+    address = urlsplit(os.environ["ELASTICSEARCH_URL"])
+    display = r"\ud800EST.EXE"
+    raw = "\ud800EST.EXE".encode("utf-16le", "surrogatepass").hex()
+    with TemporaryDirectory() as directory:
+        root = Path(directory)
+        for label, name in (
+            ("a-good", "TEST.EXE"),
+            ("b-bad", "\ud800EST.EXE"),
+            ("c-literal", display),
+        ):
+            source = artifact["create_timestamp_artifact"](
+                root / label, [130968655538095417, 130968655548095417]
+            )
+            payload = bytearray(source.read_bytes())
+            payload[16:76] = name.encode("utf-16le", "surrogatepass").ljust(60, b"\0")
+            source.write_bytes(payload)
+        for timeline in (False, True):
+            try:
+                prefetch2json(str(root), timeline_mode=timeline)
+            except PartialExtractionError as error:
+                records, diagnostics = error.records, error.diagnostics
+            else:
+                raise AssertionError("Invalid Unicode must report partial extraction")
+            assert len(records) == (6 if timeline else 3)
+            assert len(diagnostics) == 1
+            assert diagnostics[0]["stage"] == "unicode"
+            assert diagnostics[0]["utf16le"] == raw
+            mode = "timeline" if timeline else "standard"
+            index = new_index(f"unicode-recovery-{mode}")
+            try:
+                prefetch2es(
+                    str(root),
+                    host=address.hostname,
+                    port=address.port or (443 if address.scheme == "https" else 80),
+                    scheme=address.scheme,
+                    login=unquote(address.username or ""),
+                    pwd=unquote(address.password or ""),
+                    index=index,
+                    timeline_mode=timeline,
+                    chunk_size=1,
+                )
+            except PartialExtractionError as error:
+                assert error.diagnostics == diagnostics
+            else:
+                raise AssertionError("ES ingestion must report partial extraction")
+            assert stored_documents(client, index) == {
+                document_id(record): record for record in records
+            }
+            name_field = "process.name.keyword" if timeline else "name.keyword"
+            raw_field = (
+                "windows.prefetch.invalid_unicode.utf16le.keyword"
+                if timeline
+                else "invalid_unicode.utf16le.keyword"
+            )
+            assert client.count(index=index, query={"term": {name_field: display}})[
+                "count"
+            ] == (4 if timeline else 2)
+            assert client.count(index=index, query={"term": {raw_field: raw}})[
+                "count"
+            ] == (2 if timeline else 1)

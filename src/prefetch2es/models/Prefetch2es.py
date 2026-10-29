@@ -68,6 +68,43 @@ def safe_last_run_times(
     return times
 
 
+def _normalize_unicode(value, diagnostics, source_file, field=""):
+    """Escape invalid code units and retain their exact UTF-16 representation."""
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError as error:
+            diagnostics.append(
+                {
+                    "source_file": source_file,
+                    "stage": "unicode",
+                    "field": field,
+                    "utf16le": value.encode("utf-16le", "surrogatepass").hex(),
+                    "error": f"{type(error).__name__}: {error}",
+                }
+            )
+            return value.encode("utf-8", "backslashreplace").decode("utf-8")
+    elif isinstance(value, dict):
+        for key in value:
+            value[key] = _normalize_unicode(
+                value[key], diagnostics, source_file, f"{field}.{key}" if field else key
+            )
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            value[index] = _normalize_unicode(
+                item, diagnostics, source_file, f"{field}[{index}]"
+            )
+    return value
+
+
+def _unicode_originals(diagnostics):
+    return [
+        {"field": item["field"], "utf16le": item["utf16le"]}
+        for item in diagnostics
+        if item["stage"] == "unicode"
+    ]
+
+
 def _prepare_volumes(p, diagnostics, source_file):
     """Retain volume metadata when only its creation timestamp is invalid."""
     volumes = []
@@ -138,6 +175,15 @@ def process_prefetch_file(filepath: Path, tags: Union[str, Sequence[str]] = "") 
                 "source_file": str(filepath),
                 "tags": base_tags,
             }
+            source_file = (
+                str(filepath).encode("utf-8", "backslashreplace").decode("utf-8")
+            )
+            _normalize_unicode(record, diagnostics, source_file)
+            originals = _unicode_originals(diagnostics)
+            if originals:
+                record["invalid_unicode"] = originals
+            for diagnostic in diagnostics:
+                diagnostic["source_file"] = source_file
             if diagnostics:
                 raise PartialExtractionError(diagnostics, records=[record])
             return record
@@ -185,7 +231,25 @@ def process_prefetch_file_timeline(
                 }
                 for metric in p.file_metrics_entries
             ]
-            source_file = str(filepath)
+            display_source = (
+                str(filepath).encode("utf-8", "backslashreplace").decode("utf-8")
+            )
+            executable_name = _normalize_unicode(
+                executable_name, diagnostics, display_source, "process.name"
+            )
+            _normalize_unicode(
+                volumes, diagnostics, display_source, "windows.prefetch.volumes"
+            )
+            _normalize_unicode(
+                metrics, diagnostics, display_source, "windows.prefetch.metrics"
+            )
+            _normalize_unicode(base_tags, diagnostics, display_source, "tags")
+            source_file = _normalize_unicode(
+                str(filepath), diagnostics, display_source, "log.file.path"
+            )
+            originals = _unicode_originals(diagnostics)
+            for diagnostic in diagnostics:
+                diagnostic["source_file"] = display_source
 
             timeline_records = []
             for exec_time in last_exec_times:
@@ -219,6 +283,11 @@ def process_prefetch_file_timeline(
                     }
                 )
 
+            if originals:
+                for record in timeline_records:
+                    record["windows"]["prefetch"]["invalid_unicode"] = [
+                        item.copy() for item in originals
+                    ]
             if diagnostics:
                 raise PartialExtractionError(diagnostics, records=timeline_records)
             return timeline_records
@@ -436,7 +505,11 @@ class Prefetch2es(SafeMultiprocessingMixin):
                         (
                             f"volume[{diagnostic['volume_index']}].creation_time"
                             if diagnostic["stage"] == "volume_creation_time"
-                            else f"timestamp[{diagnostic['timestamp_index']}]"
+                            else (
+                                diagnostic["field"]
+                                if diagnostic["stage"] == "unicode"
+                                else f"timestamp[{diagnostic['timestamp_index']}]"
+                            )
                         )
                         + f": {diagnostic['error']}"
                         for diagnostic in error.diagnostics
