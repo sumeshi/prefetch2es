@@ -68,6 +68,35 @@ def safe_last_run_times(
     return times
 
 
+def _prepare_volumes(p, diagnostics, source_file):
+    """Retain volume metadata when only its creation timestamp is invalid."""
+    volumes = []
+    for index, volume in enumerate(p.volumes):
+        try:
+            creation_time = f"{volume.get_creation_time()}Z".replace(" ", "T")
+        except (ValueError, OverflowError) as error:
+            creation_time = None
+            diagnostic = {
+                "source_file": source_file,
+                "stage": "volume_creation_time",
+                "volume_index": index,
+                "error": f"{type(error).__name__}: {error}",
+            }
+            try:
+                diagnostic["raw"] = volume.get_creation_time_as_integer()
+            except (AttributeError, OSError, ValueError, OverflowError):
+                pass
+            diagnostics.append(diagnostic)
+        volumes.append(
+            {
+                "path": volume.device_path,
+                "creation_time": creation_time,
+                "serial_number": format(volume.serial_number, "x").upper(),
+            }
+        )
+    return volumes
+
+
 def process_prefetch_file(filepath: Path, tags: Union[str, Sequence[str]] = "") -> dict:
     """Process a single prefetch file and return its data.
 
@@ -105,16 +134,7 @@ def process_prefetch_file(filepath: Path, tags: Union[str, Sequence[str]] = "") 
                     }
                     for metrics in p.file_metrics_entries
                 ],
-                "volumes": [
-                    {
-                        "path": volume.device_path,
-                        "creation_time": f"{volume.get_creation_time()}Z".replace(
-                            " ", "T"
-                        ),
-                        "serial_number": format(volume.serial_number, "x").upper(),
-                    }
-                    for volume in p.volumes
-                ],
+                "volumes": _prepare_volumes(p, diagnostics, str(filepath)),
                 "source_file": str(filepath),
                 "tags": base_tags,
             }
@@ -157,14 +177,7 @@ def process_prefetch_file_timeline(
             exec_count = p.run_count
             prefetch_hash = format(p.prefetch_hash, "x").upper()
             format_version = p.format_version
-            volumes = [
-                {
-                    "path": volume.device_path,
-                    "creation_time": f"{volume.get_creation_time()}Z".replace(" ", "T"),
-                    "serial_number": format(volume.serial_number, "x").upper(),
-                }
-                for volume in p.volumes
-            ]
+            volumes = _prepare_volumes(p, diagnostics, str(filepath))
             metrics = [
                 {
                     "filename": metric.filename,
@@ -420,8 +433,12 @@ class Prefetch2es(SafeMultiprocessingMixin):
                 if isinstance(error, PartialExtractionError):
                     self.diagnostics.extend(error.diagnostics)
                     error_text = "; ".join(
-                        f"timestamp[{diagnostic['timestamp_index']}]: "
-                        f"{diagnostic['error']}"
+                        (
+                            f"volume[{diagnostic['volume_index']}].creation_time"
+                            if diagnostic["stage"] == "volume_creation_time"
+                            else f"timestamp[{diagnostic['timestamp_index']}]"
+                        )
+                        + f": {diagnostic['error']}"
                         for diagnostic in error.diagnostics
                     )
                 else:
