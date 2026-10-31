@@ -20,9 +20,8 @@ such library modifications. No signing key or activation step is required.
    uv sync --locked
    uv pip install --python .venv/bin/python --reinstall --no-deps ../libscca_python-20260527
    uv run --no-sync python -c "import pyscca; print(pyscca.get_version())"
-   uv run --no-sync python -m nuitka --standalone --onefile --follow-imports -o prefetch2es --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2esView.py
-   uv run --no-sync python -m nuitka --standalone --onefile --follow-imports -o prefetch2json --output-dir=dist --assume-yes-for-downloads src/prefetch2es/views/Prefetch2jsonView.py
    uv run --no-sync python .github/collect_runtime_licenses.py dist/LICENSES.txt
+   uv run --no-sync python .github/build_binaries.py
    ```
 
    On Windows replace `.venv/bin/python` with `.venv/Scripts/python.exe`.
