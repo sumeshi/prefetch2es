@@ -106,20 +106,30 @@ class Prefetch2jsonPresenter(object):
                 delete=False,
             ) as output:
                 temporary_path = Path(output.name)
-                collected: list[dict] = []
+                record_count = 0
                 try:
                     for chunk in progress:
-                        if self.output_format == "json":
-                            collected.extend(chunk)
-                        else:
-                            for record in chunk:
+                        for record in chunk:
+                            if self.output_format == "json":
+                                output.write(b"[\n" if record_count == 0 else b",\n")
+                                # Preserve the complete array's indentation
+                                # while serializing only one record at a time.
+                                output.write(
+                                    orjson.dumps(
+                                        [record], option=orjson.OPT_INDENT_2
+                                    )[2:-2]
+                                )
+                            else:
                                 output.write(orjson.dumps(record) + b"\n")
+                            record_count += 1
+                        if self.output_format == "json":
+                            output.flush()
                 except PartialExtractionError as error:
                     partial_error = error
                 if partial_error is not None and model.generated_records == 0:
                     raise partial_error
                 if self.output_format == "json":
-                    output.write(orjson.dumps(collected, option=orjson.OPT_INDENT_2))
+                    output.write(b"\n]" if record_count else b"[]")
             self._check_output(input_files, input_diagnostics)
             if os.name == "posix" and self.output_path.exists():
                 temporary_path.chmod(stat.S_IMODE(self.output_path.stat().st_mode))

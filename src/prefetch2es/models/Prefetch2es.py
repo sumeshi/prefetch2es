@@ -38,7 +38,9 @@ def normalize_tags(tags: Union[str, Sequence[str], None]) -> List[str]:
     return result
 
 
-def safe_last_run_times(p: pyscca.file) -> List[str]:
+def safe_last_run_times(
+    p: pyscca.file, diagnostics: List[dict] | None = None
+) -> List[str]:
     """Read available last-run timestamps without trusting run_count."""
     times = []
     for i in range(8):
@@ -46,10 +48,90 @@ def safe_last_run_times(p: pyscca.file) -> List[str]:
             value = p.get_last_run_time(i)
         except OSError:
             break
+        except (ValueError, OverflowError) as error:
+            if diagnostics is None:
+                raise
+            diagnostic = {
+                "stage": "last_run_time",
+                "timestamp_index": i,
+                "error": f"{type(error).__name__}: {error}",
+            }
+            try:
+                diagnostic["raw"] = p.get_last_run_time_as_integer(i)
+            except (AttributeError, OSError, ValueError, OverflowError):
+                pass
+            diagnostics.append(diagnostic)
+            continue
         if value is None or value == FILETIME_ZERO:
             continue
         times.append(f"{value}Z".replace(" ", "T"))
     return times
+
+
+def _normalize_unicode(value, diagnostics, source_file, field=""):
+    """Escape invalid code units and retain their exact UTF-16 representation."""
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError as error:
+            diagnostics.append(
+                {
+                    "source_file": source_file,
+                    "stage": "unicode",
+                    "field": field,
+                    "utf16le": value.encode("utf-16le", "surrogatepass").hex(),
+                    "error": f"{type(error).__name__}: {error}",
+                }
+            )
+            return value.encode("utf-8", "backslashreplace").decode("utf-8")
+    elif isinstance(value, dict):
+        for key in value:
+            value[key] = _normalize_unicode(
+                value[key], diagnostics, source_file, f"{field}.{key}" if field else key
+            )
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            value[index] = _normalize_unicode(
+                item, diagnostics, source_file, f"{field}[{index}]"
+            )
+    return value
+
+
+def _unicode_originals(diagnostics):
+    return [
+        {"field": item["field"], "utf16le": item["utf16le"]}
+        for item in diagnostics
+        if item["stage"] == "unicode"
+    ]
+
+
+def _prepare_volumes(p, diagnostics, source_file):
+    """Retain volume metadata when only its creation timestamp is invalid."""
+    volumes = []
+    for index, volume in enumerate(p.volumes):
+        try:
+            creation_time = f"{volume.get_creation_time()}Z".replace(" ", "T")
+        except (ValueError, OverflowError) as error:
+            creation_time = None
+            diagnostic = {
+                "source_file": source_file,
+                "stage": "volume_creation_time",
+                "volume_index": index,
+                "error": f"{type(error).__name__}: {error}",
+            }
+            try:
+                diagnostic["raw"] = volume.get_creation_time_as_integer()
+            except (AttributeError, OSError, ValueError, OverflowError):
+                pass
+            diagnostics.append(diagnostic)
+        volumes.append(
+            {
+                "path": volume.device_path,
+                "creation_time": creation_time,
+                "serial_number": format(volume.serial_number, "x").upper(),
+            }
+        )
+    return volumes
 
 
 def process_prefetch_file(filepath: Path, tags: Union[str, Sequence[str]] = "") -> dict:
@@ -67,9 +149,12 @@ def process_prefetch_file(filepath: Path, tags: Union[str, Sequence[str]] = "") 
             p.open_file_object(file_object)
             # Parse tags from comma-separated string
             base_tags = normalize_tags(tags)
-            last_exec_times = safe_last_run_times(p)
+            diagnostics = []
+            last_exec_times = safe_last_run_times(p, diagnostics)
+            for diagnostic in diagnostics:
+                diagnostic["source_file"] = str(filepath)
 
-            return {
+            record = {
                 "name": p.executable_filename,
                 "filenames": [name for name in p.filenames],
                 "exec_count": p.run_count,
@@ -86,19 +171,22 @@ def process_prefetch_file(filepath: Path, tags: Union[str, Sequence[str]] = "") 
                     }
                     for metrics in p.file_metrics_entries
                 ],
-                "volumes": [
-                    {
-                        "path": volume.device_path,
-                        "creation_time": f"{volume.get_creation_time()}Z".replace(
-                            " ", "T"
-                        ),
-                        "serial_number": format(volume.serial_number, "x").upper(),
-                    }
-                    for volume in p.volumes
-                ],
+                "volumes": _prepare_volumes(p, diagnostics, str(filepath)),
                 "source_file": str(filepath),
                 "tags": base_tags,
             }
+            source_file = (
+                str(filepath).encode("utf-8", "backslashreplace").decode("utf-8")
+            )
+            _normalize_unicode(record, diagnostics, source_file)
+            originals = _unicode_originals(diagnostics)
+            if originals:
+                record["invalid_unicode"] = originals
+            for diagnostic in diagnostics:
+                diagnostic["source_file"] = source_file
+            if diagnostics:
+                raise PartialExtractionError(diagnostics, records=[record])
+            return record
         finally:
             p.close()
 
@@ -121,7 +209,47 @@ def process_prefetch_file_timeline(
             p.open_file_object(file_object)
             # Parse tags from comma-separated string
             base_tags = normalize_tags(tags)
-            last_exec_times = safe_last_run_times(p)
+            diagnostics = []
+            last_exec_times = safe_last_run_times(p, diagnostics)
+            for diagnostic in diagnostics:
+                diagnostic["source_file"] = str(filepath)
+
+            if not last_exec_times:
+                if diagnostics:
+                    raise PartialExtractionError(diagnostics, records=[])
+                return []
+
+            executable_name = p.executable_filename
+            exec_count = p.run_count
+            prefetch_hash = format(p.prefetch_hash, "x").upper()
+            format_version = p.format_version
+            volumes = _prepare_volumes(p, diagnostics, str(filepath))
+            metrics = [
+                {
+                    "filename": metric.filename,
+                    "file_reference": hex(metric.file_reference).upper(),
+                }
+                for metric in p.file_metrics_entries
+            ]
+            display_source = (
+                str(filepath).encode("utf-8", "backslashreplace").decode("utf-8")
+            )
+            executable_name = _normalize_unicode(
+                executable_name, diagnostics, display_source, "process.name"
+            )
+            _normalize_unicode(
+                volumes, diagnostics, display_source, "windows.prefetch.volumes"
+            )
+            _normalize_unicode(
+                metrics, diagnostics, display_source, "windows.prefetch.metrics"
+            )
+            _normalize_unicode(base_tags, diagnostics, display_source, "tags")
+            source_file = _normalize_unicode(
+                str(filepath), diagnostics, display_source, "log.file.path"
+            )
+            originals = _unicode_originals(diagnostics)
+            for diagnostic in diagnostics:
+                diagnostic["source_file"] = display_source
 
             timeline_records = []
             for exec_time in last_exec_times:
@@ -138,44 +266,30 @@ def process_prefetch_file_timeline(
                             "dataset": "windows.prefetch",
                         },
                         "process": {
-                            "name": p.executable_filename,
+                            "name": executable_name,
                             "start": exec_time,
                         },
                         "windows": {
                             "prefetch": {
-                                "exec_count": p.run_count,
-                                "hash": {
-                                    "prefetch": format(p.prefetch_hash, "x").upper()
-                                },
-                                "format_version": p.format_version,
-                                "volumes": [
-                                    {
-                                        "path": volume.device_path,
-                                        "creation_time": f"{volume.get_creation_time()}Z".replace(
-                                            " ", "T"
-                                        ),
-                                        "serial_number": format(
-                                            volume.serial_number, "x"
-                                        ).upper(),
-                                    }
-                                    for volume in p.volumes
-                                ],
-                                "metrics": [
-                                    {
-                                        "filename": metrics.filename,
-                                        "file_reference": hex(
-                                            metrics.file_reference
-                                        ).upper(),
-                                    }
-                                    for metrics in p.file_metrics_entries
-                                ],
+                                "exec_count": exec_count,
+                                "hash": {"prefetch": prefetch_hash},
+                                "format_version": format_version,
+                                "volumes": [volume.copy() for volume in volumes],
+                                "metrics": [metric.copy() for metric in metrics],
                             }
                         },
-                        "log": {"file": {"path": str(filepath)}},
+                        "log": {"file": {"path": source_file}},
                         "tags": base_tags,
                     }
                 )
 
+            if originals:
+                for record in timeline_records:
+                    record["windows"]["prefetch"]["invalid_unicode"] = [
+                        item.copy() for item in originals
+                    ]
+            if diagnostics:
+                raise PartialExtractionError(diagnostics, records=timeline_records)
             return timeline_records
         finally:
             p.close()
@@ -262,6 +376,9 @@ class PartialExtractionError(RuntimeError):
             f"Partial extraction: {len(diagnostics)} failure(s); output is incomplete."
         )
 
+    def __reduce__(self):
+        return type(self), (self.diagnostics, self.records)
+
 
 def process_prefetch_task(filepath: Path, tags="", timeline_mode=False):
     """Return one file's records or its serializable processing exception."""
@@ -272,6 +389,8 @@ def process_prefetch_task(filepath: Path, tags="", timeline_mode=False):
             else [process_prefetch_file(filepath, tags)]
         )
         return filepath, records, None
+    except PartialExtractionError as error:
+        return filepath, error.records, error
     except Exception as error:
         return filepath, [], error
 
@@ -380,17 +499,35 @@ class Prefetch2es(SafeMultiprocessingMixin):
         for filepath, records, error in results:
             if error is not None:
                 error_text = f"{type(error).__name__}: {error}"
-                self.diagnostics.append(
-                    {"source_file": str(filepath), "error": error_text}
-                )
+                if isinstance(error, PartialExtractionError):
+                    self.diagnostics.extend(error.diagnostics)
+                    error_text = "; ".join(
+                        (
+                            f"volume[{diagnostic['volume_index']}].creation_time"
+                            if diagnostic["stage"] == "volume_creation_time"
+                            else (
+                                diagnostic["field"]
+                                if diagnostic["stage"] == "unicode"
+                                else f"timestamp[{diagnostic['timestamp_index']}]"
+                            )
+                        )
+                        + f": {diagnostic['error']}"
+                        for diagnostic in error.diagnostics
+                    )
+                else:
+                    self.diagnostics.append(
+                        {"source_file": str(filepath), "error": error_text}
+                    )
                 message = (
                     f"Error parsing {filepath}: {error_text} "
                     f"({self.successful_files} file(s) parsed successfully, "
                     f"{self.generated_records} record(s) generated)."
                 )
                 print(message, file=sys.stderr)
-                continue
-            self.successful_files += 1
+                if not isinstance(error, PartialExtractionError):
+                    continue
+            else:
+                self.successful_files += 1
             self.generated_records += len(records)
             for record in records:
                 buffer.append(record)
