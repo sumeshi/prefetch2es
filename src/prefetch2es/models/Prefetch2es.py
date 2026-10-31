@@ -105,8 +105,45 @@ def _unicode_originals(diagnostics):
     ]
 
 
+def _native_text(getter, diagnostics, source_file, field, index_key, index):
+    """Read one native string without discarding the rest of the Prefetch."""
+    try:
+        return getter()
+    except OSError as error:
+        diagnostics.append(
+            {
+                "source_file": source_file,
+                "stage": "native_metadata",
+                "field": field,
+                index_key: index,
+                "error": f"{type(error).__name__}: {error}",
+            }
+        )
+        return None
+
+
+def _prepare_metrics(p, diagnostics, source_file):
+    metrics = []
+    for index, metric in enumerate(p.file_metrics_entries):
+        filename = _native_text(
+            lambda metric=metric: metric.filename,
+            diagnostics,
+            source_file,
+            f"metrics[{index}].filename",
+            "metric_index",
+            index,
+        )
+        metrics.append(
+            {
+                "filename": filename,
+                "file_reference": hex(metric.file_reference).upper(),
+            }
+        )
+    return metrics
+
+
 def _prepare_volumes(p, diagnostics, source_file):
-    """Retain volume metadata when only its creation timestamp is invalid."""
+    """Retain readable volume metadata when an individual getter fails."""
     volumes = []
     for index, volume in enumerate(p.volumes):
         try:
@@ -124,9 +161,17 @@ def _prepare_volumes(p, diagnostics, source_file):
             except (AttributeError, OSError, ValueError, OverflowError):
                 pass
             diagnostics.append(diagnostic)
+        path = _native_text(
+            lambda volume=volume: volume.device_path,
+            diagnostics,
+            source_file,
+            f"volumes[{index}].path",
+            "volume_index",
+            index,
+        )
         volumes.append(
             {
-                "path": volume.device_path,
+                "path": path,
                 "creation_time": creation_time,
                 "serial_number": format(volume.serial_number, "x").upper(),
             }
@@ -164,13 +209,7 @@ def process_prefetch_file(filepath: Path, tags: Union[str, Sequence[str]] = "") 
                 "number_of_volumes": p.number_of_volumes,
                 "number_of_filenames": p.number_of_filenames,
                 "number_of_file_metrics_entries": p.number_of_file_metrics_entries,
-                "metrics": [
-                    {
-                        "filename": metrics.filename,
-                        "file_reference": hex(metrics.file_reference).upper(),
-                    }
-                    for metrics in p.file_metrics_entries
-                ],
+                "metrics": _prepare_metrics(p, diagnostics, str(filepath)),
                 "volumes": _prepare_volumes(p, diagnostics, str(filepath)),
                 "source_file": str(filepath),
                 "tags": base_tags,
@@ -224,13 +263,7 @@ def process_prefetch_file_timeline(
             prefetch_hash = format(p.prefetch_hash, "x").upper()
             format_version = p.format_version
             volumes = _prepare_volumes(p, diagnostics, str(filepath))
-            metrics = [
-                {
-                    "filename": metric.filename,
-                    "file_reference": hex(metric.file_reference).upper(),
-                }
-                for metric in p.file_metrics_entries
-            ]
+            metrics = _prepare_metrics(p, diagnostics, str(filepath))
             display_source = (
                 str(filepath).encode("utf-8", "backslashreplace").decode("utf-8")
             )
@@ -507,7 +540,7 @@ class Prefetch2es(SafeMultiprocessingMixin):
                             if diagnostic["stage"] == "volume_creation_time"
                             else (
                                 diagnostic["field"]
-                                if diagnostic["stage"] == "unicode"
+                                if diagnostic["stage"] in ("unicode", "native_metadata")
                                 else f"timestamp[{diagnostic['timestamp_index']}]"
                             )
                         )

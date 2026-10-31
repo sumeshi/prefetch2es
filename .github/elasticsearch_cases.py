@@ -128,6 +128,9 @@ def run_extra_cases(client, transport, new_index, stored_documents, document_id)
 
     run_volume_recovery_cases(client, new_index, stored_documents, document_id)
     run_unicode_recovery_cases(client, new_index, stored_documents, document_id)
+    run_native_unicode_getter_recovery_cases(
+        client, new_index, stored_documents, document_id
+    )
 
 
 def run_volume_recovery_cases(client, new_index, stored_documents, document_id):
@@ -292,3 +295,88 @@ def run_unicode_recovery_cases(client, new_index, stored_documents, document_id)
             assert client.count(index=index, query={"term": {raw_field: raw}})[
                 "count"
             ] == (2 if timeline else 1)
+
+
+def run_native_unicode_getter_recovery_cases(
+    client, new_index, stored_documents, document_id
+):
+    """Native string getter failures retain records and index null fields."""
+    artifact = runpy.run_path(str(Path(__file__).with_name("artifact_fixture.py")))
+    address = urlsplit(os.environ["ELASTICSEARCH_URL"])
+    cases = {
+        "metric": (348, "metrics[0].filename"),
+        "volume": (480, "volumes[0].path"),
+    }
+    with TemporaryDirectory() as directory:
+        for kind, (offset, field) in cases.items():
+            root = Path(directory) / kind
+            sources = [
+                artifact["create_timestamp_artifact"](
+                    root / label, [130968655538095417, 130968655548095417]
+                )
+                for label in ("a-good", "b-bad", "c-good")
+            ]
+            payload = bytearray(sources[1].read_bytes())
+            payload[offset : offset + 2] = b"\x00\xd8"
+            sources[1].write_bytes(payload)
+            for timeline in (False, True):
+                try:
+                    prefetch2json(str(root), timeline_mode=timeline)
+                except PartialExtractionError as error:
+                    records, diagnostics = error.records, error.diagnostics
+                else:
+                    raise AssertionError(
+                        "Unreadable native text must report partial extraction"
+                    )
+                native_diagnostics = [
+                    diagnostic
+                    for diagnostic in diagnostics
+                    if diagnostic.get("stage") == "native_metadata"
+                ]
+                assert len(native_diagnostics) == 1
+                assert native_diagnostics[0]["field"] == field
+                assert len(records) == (6 if timeline else 3)
+                mode = "timeline" if timeline else "standard"
+                index = new_index(f"native-getter-{kind}-{mode}")
+                try:
+                    prefetch2es(
+                        str(root),
+                        host=address.hostname,
+                        port=address.port
+                        or (443 if address.scheme == "https" else 80),
+                        scheme=address.scheme,
+                        login=unquote(address.username or ""),
+                        pwd=unquote(address.password or ""),
+                        index=index,
+                        timeline_mode=timeline,
+                        chunk_size=1,
+                    )
+                except PartialExtractionError as error:
+                    assert error.diagnostics == diagnostics
+                else:
+                    raise AssertionError("ES ingestion must report partial extraction")
+                assert stored_documents(client, index) == {
+                    document_id(record): record for record in records
+                }
+                affected = [
+                    record
+                    for record in records
+                    if (
+                        record["log"]["file"]["path"]
+                        if timeline
+                        else record["source_file"]
+                    )
+                    == str(sources[1])
+                ]
+                assert len(affected) == (2 if timeline else 1)
+                for record in affected:
+                    metadata = (
+                        record["windows"]["prefetch"] if timeline else record
+                    )
+                    assert metadata["metrics"] and metadata["volumes"]
+                    target = (
+                        metadata["metrics"][0]["filename"]
+                        if kind == "metric"
+                        else metadata["volumes"][0]["path"]
+                    )
+                    assert target is None

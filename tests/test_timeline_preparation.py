@@ -146,9 +146,9 @@ def test_empty_timeline_does_not_read_unused_metadata(tmp_path, monkeypatch, tim
     "failure",
     [
         "file.executable_filename", "file.run_count", "file.prefetch_hash",
-        "file.format_version", "file.volumes", "volume.device_path",
+        "file.format_version", "file.volumes",
         "volume.get_creation_time", "volume.serial_number",
-        "file.file_metrics_entries", "metric.filename", "metric.file_reference",
+        "file.file_metrics_entries", "metric.file_reference",
     ],
 )
 def test_metadata_read_failure_retains_file_failure_and_closes_parser(
